@@ -1,0 +1,49 @@
+name: Publish Companion
+on:
+  push:
+    tags: ['v0.5.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Candidate release tag
+        default: v0.5.0-candidate
+        required: true
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download official .NET 4.8 reference assemblies
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP 'net48.zip'
+          Invoke-WebRequest 'https://api.nuget.org/v3-flatcontainer/microsoft.netframework.referenceassemblies.net48/1.0.3/microsoft.netframework.referenceassemblies.net48.1.0.3.nupkg' -OutFile $package
+          if ((Get-FileHash $package -Algorithm SHA256).Hash -ne '8a7e348538e7eb91351696911689f49e3d4f63f8bab517432bbe159b8b1104a2') { throw 'Reference package hash mismatch' }
+          Expand-Archive $package (Join-Path $env:RUNNER_TEMP 'net48')
+      - name: Build bilingual interface and verify package
+        shell: pwsh
+        run: |
+          $refs = Join-Path $env:RUNNER_TEMP 'net48\build\.NETFramework\v4.8'
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          python windows-bridge/Build-Companion.py --refs $refs --csc $csc
+          if ($LASTEXITCODE -ne 0) { throw 'Companion build failed' }
+          python windows-bridge/Package-Release.py
+          if ($LASTEXITCODE -ne 0) { throw 'Release integrity check failed' }
+      - name: Publish bilingual candidate
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v0\.5\.[A-Za-z0-9._-]*$') { throw 'Unexpected release tag' }
+          gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --prerelease --title "$env:RELEASE_TAG · 中文 / English" --notes-file releases/v0.5.0-candidate.md
+            if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }
+          }
+          gh release upload $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY windows-bridge/dist/Split65-Companion-v0.5.0-Candidate-zh-en.zip windows-bridge/dist/Split65-Source-v0.5.0-Candidate.zip windows-bridge/dist/split65-dynamic-lighting-v0.5.0.bin windows-bridge/dist/SHA256SUMS --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Asset upload failed' }

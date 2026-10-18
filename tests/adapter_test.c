@@ -45,7 +45,7 @@ int main(void) {
     set_request(control[0], control, 2);
     split65_lamp_task();
     assert(split65_lamp_active());
-    uint8_t range[] = {DL_REPORT_RANGE, 1, 0, 0, 67, 0, 255, 0, 0, 0};
+    uint8_t range[] = {DL_REPORT_RANGE, 1, 0, 0, 67, 0, 255, 0, 0, 255};
     set_request(range[0], range, 10);
     // It takes nine small packets to commit an entire 68-lamp frame.
     for (unsigned i = 1; i <= 18; ++i) {
@@ -170,7 +170,7 @@ int main(void) {
     mock_clock += 10; split65_lamp_task(); assert(rpc_success == successes + 1);
     via[0] = 0x30;
     assert(via_command_kb(via, sizeof(via)) && !memcmp(via + 1, "DL2", 3));
-    assert(via[4] == 0x48 && via[7] == 0x44 && via[8] == 68 && via[24] == 0);
+    assert(via[4] == 0x50 && via[7] == 0x44 && via[8] == 68 && via[24] == 0);
     // Observe actual USB transactions without changing light ownership or RGB.
     via[0] = 0x31; via[1] = 2;
     assert(via_command_kb(via, sizeof(via)) && via[2] == 1);
@@ -233,5 +233,22 @@ int main(void) {
     assert(split65_lamp_active()); mock_usb.state = 0; split65_lamp_task(); assert(!raw_active);
     mock_usb.state = USB_ACTIVE; assert(!split65_lamp_active());
     assert(!split65_lamp_stream(0, 0, via));
-    puts("PASS: USB LampArray, native sync, 0.4.8 / 0.4.4 split compatibility; production wireless Raw HID replies, both-half RGB, lease/rollover/disconnect/mode/reset/USB regression");
+    // Independent intensity must affect wired rendering and both split halves.
+    // A delayed raw release from the dongle must not release wired ownership.
+    mock_device = DEVS_USB; mock_usb.state = USB_ACTIVE;
+    split65_lamp_mode_changed();control[1]=0;set_request(control[0],control,2);
+    memset(via,0,sizeof(via));via[0]=0x26;md_receive_raw_cb(via,sizeof(via));
+    assert(!state.autonomous && split65_lamp_active());
+    range[6]=255;range[7]=128;range[8]=64;
+    for(unsigned intensity=0;intensity<256;++intensity){
+        range[9]=intensity;set_request(range[0],range,sizeof(range));
+        mock_clock+=100;split65_lamp_task();
+        assert(local_frame[0].r==intensity*150/255);
+        assert(local_frame[0].g==dl_channel(128,intensity)*150/255);
+        assert(local_frame[0].b==dl_channel(64,intensity)*150/255);
+    }
+    range[9]=128;set_request(range[0],range,sizeof(range));
+    for(unsigned i=0;i<20;++i){mock_clock+=10;split65_lamp_task();}
+    assert(remote_frame[67].r==local_frame[67].r && remote_frame[67].r==75);
+    puts("PASS: USB LampArray, native sync, 0.4.9 / 0.4.4 split compatibility; production wireless Raw HID replies, both-half RGB, lease/rollover/disconnect/mode/reset/USB regression");
 }

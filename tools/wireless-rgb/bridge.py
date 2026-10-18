@@ -81,7 +81,7 @@ class WirelessLink:
         lamps = body[8]
         device = body[21]
         protocol = body[26]
-        if signature != "DL2" or revision != 0x48 or lamps != LAMPS or protocol != 1:
+        if signature != "DL2" or revision not in (0x48, 0x49, 0x50) or lamps != LAMPS or protocol != 1:
             raise SystemExit("unexpected firmware: %r rev=0x%02X lamps=%s proto=%s"
                              % (signature, revision, lamps, protocol))
         if device not in (0, 6):

@@ -13,12 +13,17 @@
 #define DL_REPORT_CONTROL 0x25
 #define DL_MAX_REPORT_SIZE 51
 #define DL_INTERVAL_US 100000
-#define DL_FIRMWARE_REVISION 0x48
+#define DL_FIRMWARE_REVISION 0x50
 // USB compatibility changes do not change the inter-half packet layout.
 // Keep the existing inter-half wire format; wireless ownership is host-side.
 #define DL_SPLIT_PROTOCOL_REVISION 0x44
 
 typedef struct { uint8_t r, g, b, intensity; } dl_color_t;
+// Advertised as 255 independent intensity levels. Fold this gain into RGB
+// for hardware/raw transports that have only RGB channels.
+static inline uint8_t dl_channel(uint8_t color, uint8_t intensity) {
+    return ((uint16_t)color * intensity + 127u) / 255u;
+}
 typedef struct {
     uint32_t x, y, z;
     uint8_t key; // USB HID Keyboard usage, not a Windows virtual-key code.

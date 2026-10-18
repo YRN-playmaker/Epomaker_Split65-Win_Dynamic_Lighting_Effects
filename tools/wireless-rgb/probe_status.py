@@ -263,7 +263,7 @@ def main():
 
     if not reply:
         print("no reply to 0x30 (%.1f s, both framings)" % args.timeout)
-        print("check: keyboard awake on 2.4G, paired to this receiver, v0.4.8 on the left half")
+        print("check: keyboard awake on 2.4G, paired to this receiver, v0.5.0 on the left half")
         return 5
 
     payload = reply[1:] if len(reply) == 33 else reply
@@ -275,9 +275,9 @@ def main():
     print("raw     : active=%s protocol=%s device=%s lease=%ss"
           % (info["raw_active"], info["raw_protocol"], info["raw_device"], info["lease_seconds"]))
     print("module  : state=%s autonomous=%s" % (info["module_state"], info["autonomous"]))
-    ok = (info["signature"] == "DL2" and info["revision"] == 0x48
+    ok = (info["signature"] == "DL2" and info["revision"] in (0x48, 0x49, 0x50)
           and info["lamp_count"] == 68 and info["raw_protocol"] == 1)
-    print("verdict : %s" % ("v0.4.8 wireless channel ready" if ok else "unexpected answer"))
+    print("verdict : %s" % ("wireless channel ready" if ok else "unexpected answer"))
     return 0 if ok else 6
 
 

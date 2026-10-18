@@ -182,10 +182,6 @@ void wireless_devs_change_kb(uint8_t old_devs, uint8_t new_devs, bool reset) {}
 void wireless_devs_change(uint8_t old_devs, uint8_t new_devs, bool reset) {
     bool changed = (old_devs == DEVS_USB) ? (new_devs != DEVS_USB) : (new_devs == DEVS_USB);
 
-    if (changed) {
-        set_transport((new_devs != DEVS_USB) ? TRANSPORT_WLS : TRANSPORT_USB);
-    }
-
     if ((wls_devs != new_devs) || reset) {
         *md_getp_state()     = MD_STATE_DISCONNECTED;
         *md_getp_indicator() = 0;
@@ -195,6 +191,12 @@ void wireless_devs_change(uint8_t old_devs, uint8_t new_devs, bool reset) {
 #ifdef SPLIT65_LAMPARRAY_ENABLE
     if (old_devs != new_devs || reset) split65_lamp_mode_changed();
 #endif
+    // Publish the mode and clear the old owner before enabling USB. Windows
+    // may enumerate and take LampArray ownership while the driver restarts;
+    // resetting afterwards would silently discard that new control request.
+    if (changed) {
+        set_transport((new_devs != DEVS_USB) ? TRANSPORT_WLS : TRANSPORT_USB);
+    }
     last_matrix_activity_trigger();
 
     md_devs_change(new_devs, reset);

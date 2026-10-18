@@ -1,8 +1,8 @@
 {
   "target": "epomaker/split65",
   "date": "2026-10-18",
-  "revision": "0.4.8-wireless-raw-rgb-candidate",
-  "usb_bcd_device": "0x0048",
+  "revision": "0.5.0-input-intensity-handoff-candidate",
+  "usb_bcd_device": "0x0050",
   "led_backend": "upstream complete 68-entry address space; no RGB_MATRIX_SPLIT",
   "hardware_tested": false,
   "windows_tested": false,
@@ -31,6 +31,14 @@
       "size_bytes": 79056,
       "sha256": "e3d2458b636d0ad9f265ba89dbb7efdb3391b9fe0fd5db4d7ea845caff2724d0"
     },
+    "split65-dynamic-lighting-v0.4.9.bin": {
+      "size_bytes": 79104,
+      "sha256": "f7cccb2886ae2bbd40dbb29b4701bee7606e66fe2b8f48b45e03acd27ae2075b"
+    },
+    "split65-dynamic-lighting-v0.5.0.bin": {
+      "size_bytes": 79336,
+      "sha256": "d11d69bae2b6eaf04b755323eae26d75102c29fc907fdb1960dba598596e5f16"
+    },
     "split65-input-check-v0.4.4.bin": {
       "size_bytes": 73188,
       "sha256": "560985d7c6e4fbab08502887ee1104ea6c65af41c11fad0802a84a5ad80963d8"
@@ -46,7 +54,7 @@
   },
   "usb_layout": "non-boot shared keyboard/mouse/media/NKRO/LampArray 0; VIA raw 1; Lamp IDs 0x20..0x25",
   "split_wire_protocol": "0x44 unchanged; current host tested against delivered 0.4.4 receive callback",
-  "status": "Built and software-regression checked; 2.4G Raw RGB implemented; no 0.4.8 hardware result; wireless Windows LampArray bridge NOT implemented",
+  "status": "Firmware and Windows software bridge built and software checked; real Windows and hardware validation pending",
   "usb_identity": "342D:E4C7 temporary experimental PID; no serial",
   "feature_reply": "actual length clamped to host wLength; 23/29/2 bytes including report ID",
   "base_0_4_4_sleep_fix_user_confirmed": true,
@@ -98,5 +106,16 @@
       "2.4G"
     ],
     "bluetooth": false
+  },
+  "source_base_commit": "0ba86ab585a3a44e682e378fbd9f0ebe9008d4c9",
+  "wired_usb_identity": "342D:E4C6 bcdDevice=0049; Hub VID/PID restored; no shared all-zero serial",
+  "wireless_bridge": "UMDF2 / inbox VHF; source under windows-bridge; accepts keyboard 0.4.8 and 0.4.9; receiver firmware unchanged",
+  "right_firmware": "Contains upstream 0ba86ab slave-key UART wake change; hardware verification pending",
+  "hardware_validation_0_4_9": {
+    "driver_install_load": false,
+    "windows_wireless_enumeration": false,
+    "windows_wireless_color_output": false,
+    "hub_wired_key_mapping": false,
+    "long_input_sleep_resume": false
   }
 }

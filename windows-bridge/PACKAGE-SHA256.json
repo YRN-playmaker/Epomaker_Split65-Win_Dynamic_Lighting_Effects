@@ -1,0 +1,17 @@
+{
+  "version": "0.5.0",
+  "files": [
+    {
+      "path": "prebuilt/Split65Bridge.exe",
+      "sha256": "6210bf696cf57d95b5383f4a1ab9a4688b56edc32537d488de1810b857209011"
+    },
+    {
+      "path": "prebuilt/driver/Split65LampBridge.dll",
+      "sha256": "850b163fc577f438bf5272ed8c584baa1a03aa9db2201c989d621366485bb8c3"
+    },
+    {
+      "path": "prebuilt/driver/Split65LampBridge.inf",
+      "sha256": "af8366b51189a86502b8cc518c7079046b835c06d622634123718516b66b776c"
+    }
+  ]
+}

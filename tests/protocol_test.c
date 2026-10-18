@@ -45,7 +45,7 @@ int main(void) {
     info[67].key = 79; info[67].x = 123456;
     assert(dl_set_feature(&s, request[0], request, 51)); // HID padding
     assert(dl_get_feature(&s, DL_REPORT_RESPONSE, out, info) == 29);
-    assert(out[26] == 1 && out[1] == 67 && out[28] == 79 && out[3] == 0x40 && out[4] == 0xE2);
+    assert(out[26] == 255 && out[1] == 67 && out[28] == 79 && out[3] == 0x40 && out[4] == 0xE2);
     assert(s.requested_lamp == 67); // Preparing a reply must not consume its ID.
     dl_feature_sent(&s, DL_REPORT_RESPONSE, out, 28);
     assert(s.requested_lamp == 67); // Truncated transfers do not advance.

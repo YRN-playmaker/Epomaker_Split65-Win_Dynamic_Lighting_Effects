@@ -8,3 +8,7 @@ tools/chroma-mapping/LATEST-Mapping-report.txt
 .venv/
 *.ChromaEffects
 *.ChromaEffect
+windows-bridge/build/
+windows-bridge/dist/
+windows-bridge/prebuilt/driver/*.lib
+windows-bridge/prebuilt/driver/*.exp

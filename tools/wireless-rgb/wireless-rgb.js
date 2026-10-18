@@ -44,7 +44,7 @@
     }
     async request(packet) {
       if (this.fault || !this.device.opened) throw Error('连接已中断，请重新连接');
-      if (!this.ready && packet[0] !== 0x30) throw Error('尚未验证 0.4.8 固件，未发送颜色');
+      if (!this.ready && packet[0] !== 0x30) throw Error('尚未验证 0.4.8/0.4.9/0.5.0 固件，未发送颜色');
       const wait = this.packetGapMs - (Date.now() - this.lastSend);
       if (wait > 0) await delay(wait);
       return new Promise((resolve, reject) => {
@@ -78,8 +78,8 @@
       this.device.addEventListener('inputreport', this.onInput);
       try {
         const info = await this.request(command(0x30));
-        if (info[1] !== 68 || info[2] !== 76 || info[3] !== 50 || info[4] !== 0x48 || info[8] !== 68 || info[26] !== 1) {
-          throw Error('未检测到支持本测试的 Split65 0.4.8；没有发送颜色');
+        if (info[1] !== 68 || info[2] !== 76 || info[3] !== 50 || (info[4] !== 0x48 && info[4] !== 0x49 && info[4] !== 0x50) || info[8] !== 68 || info[26] !== 1) {
+          throw Error('未检测到支持本测试的 Split65 0.4.8/0.4.9/0.5.0；没有发送颜色');
         }
         if (![0, 6].includes(info[21])) throw Error('请切到有线或 2.4G 模式；没有发送颜色');
         this.ready = true;

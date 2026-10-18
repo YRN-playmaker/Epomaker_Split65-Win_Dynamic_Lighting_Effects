@@ -1,3 +1,11 @@
+当前版本为 0.5.0 候选；左侧需要更新固件，驱动由新版 Companion 更新。修改及验证边界以 [0.5.0 双语说明](../releases/v0.5.0-candidate.md) 为准。下文保留历史记录。
+
+# 0.4.9 当前状态
+
+0.4.9 固件和软件桥接已构建并进行软件回归，真实 Windows 驱动加载、无线 LampArray 枚举/输出、Hub 改键和长期输入/休眠仍待验证。无线需要 Companion，单刷 BIN 不会增加接收器 LampArray。以下保留历史基线结果；版本说明以 [0.4.9](0.4.9-Wireless-Bridge.md) 为准。
+
+---
+
 # 0.4.8 候选状态
 
 0.4.8 的 2.4G Raw RGB、应答、双侧颜色、超时/断连/模式切换释放通过软件回归，硬件尚未测试。Windows 无线 LampArray 桥接未实现；不能期待只刷此版就出现无线动态照明卡片。完整说明见 [0.4.8-Wireless-RGB.md](0.4.8-Wireless-RGB.md)。
@@ -33,8 +41,8 @@
 
 ## 尚有限制
 
-- LampArray 目前仅走 USB 有线模式；2.4G 接收器和蓝牙动态照明未实现。2.4G 已有 Raw HID / VIA 参数灯控，不代表无线协议缺失；复用能力与当前串流限制见 [WIRELESS.md](WIRELESS.md)。
-- 342D:E4C7 是临时实验 PID，没有声称获得厂商正式分配。VIA/EPOMAKER Hub 的旧设备过滤可能不匹配，网页改键改灯未完整验证。
+- 0.4.9 增加 Windows 虚拟设备无线桥接候选，接收器原生 LampArray 与蓝牙动态照明仍未实现。2.4G 已有 Raw HID / VIA 参数灯控，不代表无线协议缺失；复用能力与当前串流限制见 [WIRELESS.md](WIRELESS.md)。
+- 0.4.9 有线 PID 恢复 342D:E4C6，以匹配 Hub 当前注册表；实际网页改键改灯仍需验证。虚拟 E4C8 为实验身份。
 - 使用共享非 Boot HID 接口，BIOS/UEFI 输入未保证。
 - InputBinding 固定为出厂 Windows 基础层，VIA 改键不会自动改变灯光按键映射。
 - 亮度上限保持 150/255；几何坐标是键盘合拢布局近似值，不会自动获知两半在桌面上的距离和角度。

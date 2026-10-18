@@ -70,21 +70,19 @@ static uint8_t md_rev_payload[MD_SEND_PKT_PAYLOAD_MAX] = {0};
 static uint8_t md_raw_payload[MD_RAW_SIZE]             = {0};
 static uint8_t pending_keyboard[MD_SND_CMD_KB_LEN], pending_overflow[MD_SND_CMD_NKRO_LEN];
 static bool keyboard_pending;
+// Input has a separate, coalescing priority lane. Never require the auxiliary
+// FIFO (which includes every RGB ACK) to empty before sending a key release.
+enum { MD_TX_NONE, MD_TX_AUX, MD_TX_KEYBOARD, MD_TX_OVERFLOW };
+static uint8_t tx_kind, tx_retry;
+static uint32_t tx_size, tx_timer;
+static uint8_t frozen_overflow[MD_SND_CMD_NKRO_LEN];
+static bool overflow_due, auxiliary_turn;
 
 void md_send_keyboard_state(const uint8_t *keyboard, const uint8_t *overflow) {
     memcpy(pending_keyboard, keyboard, sizeof(pending_keyboard));
     if (overflow) memcpy(pending_overflow, overflow, sizeof(pending_overflow));
     else memset(pending_overflow, 0, sizeof(pending_overflow));
     keyboard_pending = true;
-}
-
-static void md_keyboard_task(void) {
-    // Reserve the pair together. If full, retain the latest complete state,
-    // including key releases, for a later task instead of blocking scanning.
-    if (!keyboard_pending || smsg_is_busy() || smsg_free_slots() < 2) return;
-    md_send_kb(pending_keyboard);
-    md_send_nkro(pending_overflow);
-    keyboard_pending = false;
 }
 
 static md_info_t md_info = {
@@ -264,32 +262,61 @@ static void md_receive_msg_task(void) {
 }
 
 static void md_send_pkt_task(void) {
-    static uint32_t smsg_timer = 0x00;
-    static uint8_t smsg_retry  = 0;
-
     switch (smsg_get_state()) {
         case smsg_state_busy: {
-            if (sync_timer_elapsed32(smsg_timer) > (MD_SNED_PKT_TIMEOUT)) {
+            if (sync_timer_elapsed32(tx_timer) > MD_SNED_PKT_TIMEOUT) {
                 smsg_set_state(smsg_state_retry);
             }
         } break;
         case smsg_state_retry: {
-            if (++smsg_retry > MD_SEND_PKT_RETRY) {
-                smsg_retry = 0;
-                smsg_pop();
+            // A failed lighting response must not occupy the transmitter for
+            // all forty factory retries while a newer input state is waiting.
+            bool yield = keyboard_pending && tx_retry >= 2 &&
+                (tx_kind != MD_TX_AUX || md_pkt_payload[0] == MD_SND_CMD_RAW);
+            if (++tx_retry > MD_SEND_PKT_RETRY || yield) {
+                if (tx_kind == MD_TX_AUX) smsg_pop();
+                if (tx_kind == MD_TX_KEYBOARD || tx_kind == MD_TX_OVERFLOW) overflow_due = false;
+                tx_kind = MD_TX_NONE;
+                tx_retry = 0;
             }
             smsg_set_state(smsg_state_free);
         } break;
         case smsg_state_replied: {
-            smsg_retry = 0;
-            smsg_pop();
+            tx_retry = 0;
+            if (tx_kind == MD_TX_AUX) smsg_pop();
+            if (tx_kind == MD_TX_KEYBOARD) overflow_due = true;
+            if (tx_kind == MD_TX_OVERFLOW) { overflow_due = false; auxiliary_turn = true; }
+            tx_kind = MD_TX_NONE;
             smsg_set_state(smsg_state_free);
         } /* fall through */
         case smsg_state_free: {
-            uint32_t size = smsg_peek(md_pkt_payload);
-            if (size) {
-                md_send_pkt(md_pkt_payload, size);
-                smsg_timer = sync_timer_read32();
+            if (tx_kind == MD_TX_NONE) {
+                if (overflow_due) {
+                    tx_kind = MD_TX_OVERFLOW;
+                    tx_size = MD_SND_CMD_NKRO_LEN + 2;
+                    md_pkt_payload[0] = MD_SND_CMD_SEND_NKRO;
+                    memcpy(md_pkt_payload + 1, frozen_overflow, sizeof(frozen_overflow));
+                    md_calc_check_sum(md_pkt_payload, tx_size - 1);
+                } else if (auxiliary_turn && smsg_is_busy()) {
+                    tx_kind = MD_TX_AUX;
+                    tx_size = smsg_peek(md_pkt_payload);
+                    auxiliary_turn = false;
+                } else if (keyboard_pending) {
+                    tx_kind = MD_TX_KEYBOARD;
+                    tx_size = MD_SND_CMD_KB_LEN + 2;
+                    md_pkt_payload[0] = MD_SND_CMD_SEND_KB;
+                    memcpy(md_pkt_payload + 1, pending_keyboard, sizeof(pending_keyboard));
+                    memcpy(frozen_overflow, pending_overflow, sizeof(frozen_overflow));
+                    md_calc_check_sum(md_pkt_payload, tx_size - 1);
+                    keyboard_pending = false;
+                } else {
+                    tx_size = smsg_peek(md_pkt_payload);
+                    if (tx_size) tx_kind = MD_TX_AUX;
+                }
+            }
+            if (tx_kind != MD_TX_NONE) {
+                md_send_pkt(md_pkt_payload, tx_size);
+                tx_timer = sync_timer_read32();
                 smsg_set_state(smsg_state_busy);
             }
         } break;
@@ -303,13 +330,16 @@ void md_init(void) {
     uart_init(MD_BAUD_RATE);
     smsg_init();
     keyboard_pending = false;
+    tx_kind = MD_TX_NONE;
+    tx_retry = 0;
+    tx_size = tx_timer = 0;
+    overflow_due = auxiliary_turn = false;
 
     memset(md_pkt_payload, 0, sizeof(md_pkt_payload));
 }
 
 void md_main_task(void) {
     md_receive_msg_task();
-    md_keyboard_task();
     md_send_pkt_task();
 }
 

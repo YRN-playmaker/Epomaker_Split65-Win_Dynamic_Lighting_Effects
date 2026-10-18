@@ -1,0 +1,62 @@
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider=%Provider%
+DriverVer=10/18/2026,0.5.0.0
+CatalogFile=Split65LampBridge.cat
+PnpLockdown=1
+
+[Manufacturer]
+%Provider%=Models,NTamd64.10.0...26100
+
+[Models.NTamd64.10.0...26100]
+%DeviceName%=Bridge,ROOT\Split65LampBridge
+
+[DestinationDirs]
+DriverCopy=13
+
+[SourceDisksNames]
+1=%DiskName%,,,
+
+[SourceDisksFiles]
+Split65LampBridge.dll=1
+
+[Bridge.NT]
+CopyFiles=DriverCopy
+Include=WUDFRD.inf,hidvhf.inf
+Needs=WUDFRD_UpperFilter.NT,vhfservice.NT
+
+[DriverCopy]
+Split65LampBridge.dll
+
+[Bridge.NT.HW]
+Include=WUDFRD.inf,hidvhf.inf
+Needs=WUDFRD_UpperFilter.NT.HW,vhfservice.NT.HW
+AddReg=DeviceProperties
+
+[DeviceProperties]
+HKR,,Security,,"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)(A;;GA;;;UD)"
+; Explicit device-specific reflector binding, per Microsoft's UMDF filter guide.
+; This is on ROOT\Split65LampBridge only, never the keyboard/HID setup class.
+HKR,,UpperFilters,0x00010008,"WUDFRd"
+
+[Bridge.NT.Services]
+Include=WUDFRD.inf,hidvhf.inf
+Needs=WUDFRD_UpperFilter.NT.Services,vhfservice.NT.Services
+
+[Bridge.NT.Wdf]
+UmdfService=Split65LampBridge,BridgeService
+UmdfServiceOrder=Split65LampBridge
+UmdfKernelModeClientPolicy=AllowKernelModeClients
+UmdfFileObjectPolicy=AllowNullAndUnknownFileObjects
+UmdfFsContextUsePolicy=CannotUseFsContexts
+
+[BridgeService]
+UmdfLibraryVersion=2.15
+ServiceBinary=%13%\Split65LampBridge.dll
+
+[Strings]
+Provider="Split65 Community Experimental"
+DeviceName="Split65 Wireless LampArray Bridge"
+DiskName="Split65 LampArray Bridge"

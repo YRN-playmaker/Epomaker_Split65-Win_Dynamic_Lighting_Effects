@@ -19,7 +19,7 @@ def linked(name):
     return binary[offset:offset + size]
 
 device = linked('DeviceDescriptor')
-assert device[8:14] == bytes.fromhex('2d34 c7e4 4800')
+assert device[8:14] == bytes.fromhex('2d34 c6e4 5000')
 assert device[16] == 0, 'Do not reuse the all-zero USB serial'
 assert ' SerialNumberString' not in symbols
 config = linked('ConfigurationDescriptor')
@@ -57,4 +57,4 @@ assert bytes.fromhex('8501') in original
 assert interfaces[0]['report_length'] == len(shared)
 assert ' LampArrayReport' not in symbols
 subprocess.run([sys.executable, Path(__file__).resolve().parents[1] / 'tools/generate_lamp_descriptor.py', '--check'], check=True)
-print(f'PASS: linked VID/PID 342D:E4C7 bcdDevice=0048; non-boot keyboard+LampArray interface 0, VIA 1; unchanged {len(original)} input bytes; LampArray {len(lamp)} bytes')
+print(f'PASS: linked VID/PID 342D:E4C6 bcdDevice=0050; non-boot keyboard+LampArray interface 0, VIA 1; unchanged {len(original)} input bytes; LampArray {len(lamp)} bytes')

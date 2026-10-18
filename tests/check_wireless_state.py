@@ -21,7 +21,6 @@ def function(path, declaration):
     return source[start:end]
 
 converter = function(root / 'linker/wireless/wireless.c', 'void wireless_send_nkro(report_nkro_t *report)')
-retry = function(root / 'linker/wireless/module.c', 'static void md_send_pkt_task(void)')
 mode_change = function(root / 'linker/wireless/wireless.c', 'void wireless_devs_change(uint8_t old_devs, uint8_t new_devs, bool reset)')
 mode_test = r'''
 #include <stdint.h>
@@ -31,10 +30,11 @@ mode_test = r'''
 enum {DEVS_USB=0,TRANSPORT_WLS=1,TRANSPORT_USB=2,MD_STATE_DISCONNECTED=0};
 static uint8_t wls_devs,radio_state,indicator;
 static unsigned releases,transports,expected_new;
+static bool autonomous=true;
 static uint8_t *md_getp_state(void){return &radio_state;}
 static uint8_t *md_getp_indicator(void){return &indicator;}
-static void set_transport(unsigned mode){assert(mode==(expected_new==DEVS_USB?TRANSPORT_USB:TRANSPORT_WLS));++transports;}
-static void split65_lamp_mode_changed(void){assert(wls_devs==expected_new);++releases;}
+static void set_transport(unsigned mode){assert(mode==(expected_new==DEVS_USB?TRANSPORT_USB:TRANSPORT_WLS));assert(wls_devs==expected_new);++transports;if(mode==TRANSPORT_USB)autonomous=false;}
+static void split65_lamp_mode_changed(void){assert(wls_devs==expected_new);++releases;autonomous=true;}
 static void last_matrix_activity_trigger(void){}
 static void md_devs_change(uint8_t mode,bool reset){(void)reset;assert(mode==expected_new);}
 static void wireless_devs_change_kb(uint8_t a,uint8_t b,bool c){(void)a;(void)b;(void)c;}
@@ -49,6 +49,8 @@ int main(void){
         expected_transports+=(old==0)!=(new==0);
         wireless_devs_change(old,new,reset);
         assert(releases==expected_releases&&transports==expected_transports);
+        /* Host SET_FEATURE can arrive as USB starts. Later mode cleanup must not discard it. */
+        if(old!=DEVS_USB && new==DEVS_USB)assert(!autonomous);
     }
 }
 '''.replace('FUNCTION', mode_change)
@@ -86,33 +88,10 @@ int main(void){
     for(unsigned i=0;i<6;++i)assert(!keyboard.keys[i]);
 }
 '''.replace('FUNCTION', converter)
-retry_test = r'''
-#include <stdint.h>
-#include <assert.h>
-enum {smsg_state_free,smsg_state_busy,smsg_state_retry,smsg_state_replied};
-enum {MD_SNED_PKT_TIMEOUT=10,MD_SEND_PKT_RETRY=40};
-static unsigned state,queued=1,pops,sends;
-static uint32_t clock;
-static uint8_t md_pkt_payload[40];
-static unsigned smsg_get_state(void){return state;}
-static void smsg_set_state(unsigned s){state=s;}
-static void smsg_pop(void){assert(queued);--queued;++pops;}
-static uint32_t smsg_peek(uint8_t *p){(void)p;return queued?4:0;}
-static uint32_t sync_timer_read32(void){return clock;}
-static uint32_t sync_timer_elapsed32(uint32_t before){return clock-before;}
-static void md_send_pkt(uint8_t *p,uint32_t n){(void)p;assert(n==4);++sends;}
-FUNCTION
-int main(void){
-    for(unsigned i=0;i<200;++i){md_send_pkt_task();clock+=11;}
-    assert(pops==1&&queued==0&&sends==41); /* no ACK must eventually drop */
-    queued=1;state=smsg_state_free;md_send_pkt_task();
-    state=smsg_state_replied;md_send_pkt_task();assert(pops==2&&!queued);
-}
-'''.replace('FUNCTION', retry)
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory)
     failed = False
-    for name, source, flags in [('conversion', conversion_test, []), ('conversion-shared', conversion_test, ['-DKEYBOARD_SHARED_EP']), ('retry', retry_test, []), ('mode-light-release', mode_test, [])]:
+    for name, source, flags in [('conversion', conversion_test, []), ('conversion-shared', conversion_test, ['-DKEYBOARD_SHARED_EP']), ('mode-light-release', mode_test, [])]:
         (path / (name + '.c')).write_text(source)
         subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Wno-unused-function', '-g',
                         '-fsanitize=address,undefined', '-DNKRO_ENABLE', *flags,

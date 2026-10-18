@@ -71,7 +71,7 @@ size_t dl_get_feature(const dl_state_t *s, uint8_t id, uint8_t *p, const dl_lamp
             put32(p + 3, info[lamp].x); put32(p + 7, info[lamp].y); put32(p + 11, info[lamp].z);
             put32(p + 15, DL_INTERVAL_US); put32(p + 19, 1); // Control purpose
             p[23] = p[24] = p[25] = 255;
-            p[26] = 1; // RGB LEDs have no independent intensity channel (Microsoft sample).
+            p[26] = 255; // Software intensity gain, consistently applied by both output paths.
             p[27] = 1; p[28] = info[lamp].key;
             return 29;
         }

@@ -2,16 +2,16 @@
 <html lang="zh-CN">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Split65 · 0.4.8 无线灯光测试</title>
+<title>Split65 · 0.5.0 无线灯光测试</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,"Microsoft YaHei",sans-serif;background:#11151c;color:#e9eef5}body{max-width:840px;margin:48px auto;padding:0 22px;line-height:1.75}h1{font-size:29px;margin-bottom:6px}p{color:#bcc9d9}section{background:#1a222d;border:1px solid #344254;border-radius:14px;padding:22px;margin:22px 0}button{font:inherit;padding:10px 17px;border-radius:8px;border:1px solid #536980;background:#283b52;color:#fff;cursor:pointer;margin:5px}button:disabled{opacity:.4;cursor:default}input{font:inherit;padding:7px;width:78px;background:#11151c;color:#fff;border:1px solid #536980;border-radius:6px}.tag{color:#8bd6bf;font-size:14px}.note{border-left:3px solid #dfbb6f;padding-left:15px}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:270px;overflow:auto;font:13px/1.7 ui-monospace,monospace;color:#b3d3e7}#status{color:#8bd6bf}small{color:#bcc9d9}a{color:#a3c8ff}
 </style>
-<span class="tag">EPOMAKER SPLIT65 · v0.4.8 候选版</span>
+<span class="tag">EPOMAKER SPLIT65 · v0.5.0 候选版</span>
 <h1>验证 2.4G 逐灯控制</h1>
 <p>本页通过接收器直接控制灯光。它用于测试无线颜色传输，尚不提供 Windows 动态照明自动识别。</p>
 <p class="note">保留整个文件夹，用 Edge 或 Chrome 打开本页。退出 OpenRGB 和 Hub；键盘切到 2.4G，拔掉键盘直连电脑的数据线，保留接收器及正常的左右连接。</p>
 <section>
-<b>1 · 连接</b><p>选择 Split65 接收器。连接时只读取固件信息，确认 0.4.8 后才开放颜色按钮。</p>
+<b>1 · 连接</b><p>选择 Split65 接收器。连接时只读取固件信息，确认 0.5.0 后才开放颜色按钮。</p>
 <button id="connect">选择接收器</button><button id="disconnect" disabled>断开</button>
 <div id="status" role="status">尚未连接</div>
 </section>
@@ -35,8 +35,8 @@ function state() { $('connect').disabled = busy || !!client; $('disconnect').dis
 async function run(fn) { if (busy) return; busy = true; state(); try { await fn(); } catch(e) { $('status').textContent = e.message; log('失败：' + e.message); } finally { busy = false; state(); } }
 function show(info) {
   const mode = info[21] === 6 ? '2.4G' : info[21] === 0 ? 'USB 有线' : '其他模式';
-  $('status').textContent = '已连接 · 0.4.8 · ' + mode + (mode === 'USB 有线' ? '（当前不能证明无线通道可用）' : '');
-  log('固件=0.4.' + (info[4] & 15) + '；模式=' + mode + '；无线状态=' + info[29] + '；串流接管=' + info[20] + '；另一半协议=0x' + info[7].toString(16) + '；租期=' + info[28] + ' 秒');
+  $('status').textContent = '已连接 · 0.' + (info[4] >> 4) + '.' + (info[4] & 15) + ' · ' + mode + (mode === 'USB 有线' ? '（当前不能证明无线通道可用）' : '');
+  log('固件=0.' + (info[4] >> 4) + '.' + (info[4] & 15) + '；模式=' + mode + '；无线状态=' + info[29] + '；串流接管=' + info[20] + '；另一半协议=0x' + info[7].toString(16) + '；租期=' + info[28] + ' 秒');
 }
 $('connect').onclick = () => run(async () => {
   if (!navigator.hid) throw Error('请使用支持 WebHID 的 Edge 或 Chrome');

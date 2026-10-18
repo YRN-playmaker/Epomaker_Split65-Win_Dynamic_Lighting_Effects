@@ -314,7 +314,10 @@ void split65_lamp_task(void) {
     memcpy(local_frame, raw_frame, sizeof(local_frame));
     chSysUnlock();
     for (unsigned i = 0; i < DL_LAMP_COUNT; ++i) {
-        const dl_color_t c = lamp_owned ? snapshot[i] : (dl_color_t){local_frame[i].r, local_frame[i].g, local_frame[i].b, 255};
+        dl_color_t c = lamp_owned ? snapshot[i] : (dl_color_t){local_frame[i].r, local_frame[i].g, local_frame[i].b, 255};
+        c.r = dl_channel(c.r, c.intensity);
+        c.g = dl_channel(c.g, c.intensity);
+        c.b = dl_channel(c.b, c.intensity);
         const unsigned limit = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
         local_frame[i] = (pixel_t){(uint32_t)c.r * limit / 255,
                                   (uint32_t)c.g * limit / 255,

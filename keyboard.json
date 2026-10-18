@@ -816,8 +816,8 @@
     "tap_keycode_delay": 10,
     "url": "https://epomaker.com/products/epomaker-split-65",
     "usb": {
-        "device_version": "0.4.8",
-        "pid": "0xE4C7",
+        "device_version": "0.5.0",
+        "pid": "0xE4C6",
         "suspend_wakeup_delay": 1000,
         "vid": "0x342D",
         "shared_endpoint": {
