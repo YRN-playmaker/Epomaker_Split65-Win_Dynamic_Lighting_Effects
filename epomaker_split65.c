@@ -1625,8 +1625,28 @@ void hs_reset_settings(void) {
     keyboard_post_init_kb();
 }
 
+#if defined(WIRELESS_ENABLE) && defined(SPLIT_KEYBOARD) && defined(SERIAL_USART_DRIVER)
+/* The split link is master-polled: the master starts every transaction, so while
+ * it sits in STOP mode no traffic exists and a slave-side keypress has no way to
+ * reach it. That made the right half look dead after sleep until a left key woke
+ * the master. Emit a few bytes on the shared UART so the master's armed edge
+ * event fires; the split parser discards them because they carry no sync byte or
+ * checksum. */
+static void split65_wake_peer(void) {
+    for (uint8_t i = 0; i < 3; ++i) {
+        sdPut(&SERIAL_USART_DRIVER, 0x00);
+        wait_ms(2);
+    }
+}
+#endif
+
 void lpwr_wakeup_hook(void) {
 #ifdef WIRELESS_ENABLE
+#    if defined(SPLIT_KEYBOARD) && defined(SERIAL_USART_DRIVER)
+    if (!is_keyboard_master() && lpwr_get_sleep_wakeupcd() == LPWR_WAKEUP_MATRIX) {
+        split65_wake_peer();
+    }
+#    endif
     hs_mode_scan(false, confinfo.devs, confinfo.last_btdevs);
 #endif
 
