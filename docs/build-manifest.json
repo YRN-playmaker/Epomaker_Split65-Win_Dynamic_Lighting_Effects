@@ -1,0 +1,74 @@
+{
+  "target": "epomaker/split65",
+  "date": "2026-10-18",
+  "revision": "0.4.7-user-confirmed-Chroma-layout-workaround",
+  "usb_bcd_device": "0x0047",
+  "led_backend": "upstream complete 68-entry address space; no RGB_MATRIX_SPLIT",
+  "hardware_tested": true,
+  "windows_tested": true,
+  "qmk_base": "c64b964e0785a0345e8901fc15120a607cface9b",
+  "official_base": "8e253c005ee0bbacac0db3a09538d94ce3650ac5",
+  "community_reference": "3978e3e18e3de9cf95ee1256ca6c1754804678a5",
+  "microsoft_reference": "deb7e5e20d96bab5571ee2629d634375002f5513",
+  "compiler": "arm-none-eabi-gcc 13.2.1 20231009",
+  "qmk_cli": "1.2.0",
+  "submodules": {
+    "chibios": "6170ddf92d55be54c89b708d1882eea229edeb2c",
+    "chibios-contrib": "16782528eda8d7471b768ce0f4b4458807b00328",
+    "lufa": "549b97320d515bfca2f95c145a67bd13be968faa",
+    "printf": "c2e3b4e10d281e7f0f694d3ecbd9f320977288cc"
+  },
+  "firmware": {
+    "split65-dynamic-lighting-v0.4.4.bin": {
+      "size_bytes": 79040,
+      "sha256": "0e78b39094449951877db2331af28e254adbf3004bbbe64aaf42312edd2bedd5"
+    },
+    "split65-dynamic-lighting-v0.4.7.bin": {
+      "size_bytes": 78776,
+      "sha256": "726045f71d0879576e029253cfbce577ceee371c6ea817f0b586f06c4239b5e7"
+    },
+    "split65-input-check-v0.4.4.bin": {
+      "size_bytes": 73188,
+      "sha256": "560985d7c6e4fbab08502887ee1104ea6c65af41c11fad0802a84a5ad80963d8"
+    },
+    "split65-input-check-v0.4.7.bin": {
+      "size_bytes": 73188,
+      "sha256": "2af957b6afa4a6d47abdb7ad109c647166d4d7590224d785d02952adf9d919dc"
+    }
+  },
+  "usb_layout": "non-boot shared keyboard/mouse/media/NKRO/LampArray 0; VIA raw 1; Lamp IDs 0x20..0x25",
+  "split_wire_protocol": "0x44; 0.4.7 host tested against delivered 0.4.4 target callback",
+  "status": "Experimental: Windows native recognized after OpenRGB removal; both halves reported v0.4.7; user confirms Chroma coupling cleared after layout separation; firmware bytes unchanged",
+  "usb_identity": "342D:E4C7 temporary experimental PID; no serial",
+  "feature_reply": "actual length clamped to host wLength; 23/29/2 bytes including report ID",
+  "base_0_4_4_sleep_fix_user_confirmed": true,
+  "microsoft_rp2040_reference": "4666e34dcb87d6500230a55e0d34ce696bea4c4f",
+  "descriptor_origin": "327 bytes generated from checked-in TinyUSB macro used by Microsoft RP2040 sample",
+  "boot_keyboard_declared": false,
+  "independent_intensity": false,
+  "vhf_driver_implemented": false,
+  "wb32_ep0_patch": "dynamic_lighting/wb32-ep0.patch; enabled only for LampArray build",
+  "metadata_cursor": "read-only preparation; full IN data completion advances; reset restores lamp 0",
+  "validation_scope": {
+    "source": "user-reported hardware observations; no development-host access to Windows hardware",
+    "windows_native_enumeration": "user reconfirmed after OpenRGB removal with both halves at reported v0.4.7",
+    "windows_basic_lighting": "user confirms on/off",
+    "native_effect_switching": "user reports working",
+    "right_sleep_resume": "prior fix user-confirmed; both halves now reported v0.4.7; new long sleep regression not separately confirmed",
+    "chroma": "USER-CONFIRMED WORKAROUND: cross-device lighting disappeared after importing separated native/WDL mouse layout; firmware unchanged",
+    "full_per_key_color_test": "not completed",
+    "long_duration_input_regression": "not completed",
+    "wireless_lamparray": "not implemented",
+    "hlk_certified": false,
+    "razer_certified": false,
+    "windows_lamp_metadata": "2026-10-18 user WinRT result: all 68 positions match source; four focus key bindings match; zero read errors; Split65 FromId ~28 ms",
+    "chroma_cobra_wdl_card_isolation": "user tried disabling both Cobra Pro WDL cards and restarting Chroma; cross-device effect attachment persists; not a fix",
+    "next_evidence": "No further diagnosis required for current reproduction; broader effects and long-duration regression remain outside confirmed scope",
+    "chroma_profile_pair": "user exported mouse-only 11-lamp target and Split65 P-only target (LED40); distinct targets confirmed; user reports both cause cross-device lighting; configuration-missave hypothesis withdrawn",
+    "latest_user_state": "2026-10-18: both halves v0.4.7; OpenRGB removed, native recognition restored; separated Chroma layout imported, user reports cross-device coupling gone",
+    "chroma_same_version_test": "FAILED: user reports same cross-device lighting after flashing both halves v0.4.7; version alignment did not fix symptom",
+    "chroma_coordinate_model": "Inferred 40-pixel grid predicts original P/native-mouse collision and all five WDL conflicts; model overlap 8->0 after mouse layout separation, user confirms symptom gone; internal implementation unverified",
+    "chroma_latest_export": "3 devices: Split65 plus native and WDL Cobra Pro representations; static layer has no saved regions",
+    "chroma_layout_workaround_user_confirmed": true
+  }
+}

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+tools/deep-diagnostics/Results/
+tools/chroma-mapping/Split65-Chroma-Mapping-*/
+tools/chroma-mapping/Split65-Chroma-Mapping-*.zip
+tools/chroma-mapping/LATEST-Mapping-report.txt
+*.etl
+.venv/
+*.ChromaEffects
+*.ChromaEffect

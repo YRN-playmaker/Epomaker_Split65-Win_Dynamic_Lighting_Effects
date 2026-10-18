@@ -1,0 +1,43 @@
+{
+  "Firmware": "v0.4.7",
+  "LampCount": 68,
+  "Note": "Derived from checked-in lamp_info.inc. Windows VK values and USB HID usages have different meanings.",
+  "FocusLamps": [
+    {
+      "Index": 37,
+      "Label": "Backslash (US)",
+      "VirtualKey": 220,
+      "UsbHidUsage": 49,
+      "Xmeters": 0.2684,
+      "Ymeters": 0.02904,
+      "Zmeters": 0.0
+    },
+    {
+      "Index": 49,
+      "Label": "Semicolon (US)",
+      "VirtualKey": 186,
+      "UsbHidUsage": 51,
+      "Xmeters": 0.21128,
+      "Ymeters": 0.04808,
+      "Zmeters": 0.0
+    },
+    {
+      "Index": 51,
+      "Label": "Enter",
+      "VirtualKey": 13,
+      "UsbHidUsage": 40,
+      "Xmeters": 0.26024,
+      "Ymeters": 0.04808,
+      "Zmeters": 0.0
+    },
+    {
+      "Index": 40,
+      "Label": "P",
+      "VirtualKey": 80,
+      "UsbHidUsage": 19,
+      "Xmeters": 0.2072,
+      "Ymeters": 0.02904,
+      "Zmeters": 0.0
+    }
+  ]
+}

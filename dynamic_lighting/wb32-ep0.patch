@@ -1,0 +1,60 @@
+diff --git a/os/hal/ports/WB32/LLD/USBv1/hal_usb_lld.c b/os/hal/ports/WB32/LLD/USBv1/hal_usb_lld.c
+index 6cfb988..5396192 100644
+--- a/os/hal/ports/WB32/LLD/USBv1/hal_usb_lld.c
++++ b/os/hal/ports/WB32/LLD/USBv1/hal_usb_lld.c
+@@ -289,12 +289,23 @@ static void usb_serve_ep0_handler(USBDriver *usbp) {
+ 
+           if (n < epcp->in_maxsize)
+             ControlReg |= USB_CSR0_DATAEND;
++#if defined(SPLIT65_LAMPARRAY_ENABLE)
++          /* An exact-length final packet also completes the data stage. */
++          if (isp->txcnt + n == isp->txsize &&
++              isp->txsize == ((size_t)usbp->setup[6] | ((size_t)usbp->setup[7] << 8)))
++            ControlReg |= USB_CSR0_DATAEND;
++#endif
+ 
+           /* Transfer not complete, there are more packets to send.*/
+           WB32_USB->CSR0 = ControlReg;
+         }
+         else {
+-          if (isp->txlast == epcp->in_maxsize) {
++          if (isp->txlast == epcp->in_maxsize
++#if defined(SPLIT65_LAMPARRAY_ENABLE)
++              /* ZLP is needed only for a short, packet-aligned reply. */
++              && isp->txsize < ((size_t)usbp->setup[6] | ((size_t)usbp->setup[7] << 8))
++#endif
++             ) {
+             ControlReg |= USB_CSR0_DATAEND;
+             WB32_USB->CSR0 = ControlReg;
+             isp->txlast = 0;
+@@ -338,6 +349,17 @@ static void usb_serve_ep0_handler(USBDriver *usbp) {
+       }
+     }
+   }
++#if defined(SPLIT65_LAMPARRAY_ENABLE)
++  /* IN completion and the next SETUP can share the read-to-clear EP0 IRQ.
++     Consume an already queued setup after finishing IN, instead of waiting
++     for a second interrupt edge that may never arrive. Keep this bounded.
++     COUNT0 distinguishes an eight-byte SETUP from a zero-byte OUT status. */
++  WB32_USB->INDEX = 0;
++  if (usbp->ep0state == USB_EP0_STP_WAITING &&
++      (WB32_USB->CSR0 & USB_CSR0_OUTPKTRDY) && WB32_USB->COUNT0 == 8) {
++    _usb_isr_invoke_setup_cb(usbp, 0);
++  }
++#endif
+ }
+ 
+ /**
+@@ -949,6 +971,12 @@ void usb_lld_start_in(USBDriver *usbp, usbep_t ep) {
+     if (n < (size_t)usbp->epc[0]->in_maxsize) {
+       ControlReg |= USB_CSR0_DATAEND;
+     }
++#if defined(SPLIT65_LAMPARRAY_ENABLE)
++    if (n == isp->txsize &&
++        isp->txsize == ((size_t)usbp->setup[6] | ((size_t)usbp->setup[7] << 8))) {
++      ControlReg |= USB_CSR0_DATAEND;
++    }
++#endif
+     WB32_USB->CSR0 = ControlReg;
+   }
+ }

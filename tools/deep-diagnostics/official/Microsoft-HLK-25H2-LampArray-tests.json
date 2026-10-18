@@ -1,0 +1,164 @@
+{
+  "source": "https://aka.ms/HLKPlaylist",
+  "download": "https://publicassetsprod-fcabgkc8cbaufuee.b02.azurefd.net/publicassets/CompatPlaylists.zip",
+  "zip_sha256": "5badf3373e35b84560c3843cdba7d8fe7257b4e1a95603cbe5769474a7fce745",
+  "source_member": "Compat Playlists/HLK Version 25H2 CompatPlaylist x64 ARM64.xml",
+  "tests": [
+    {
+      "Id": "653d223c-1ec7-440b-8e86-d23fb9286989",
+      "Name": "Dynamic Lighting LampArrayHid Device Tests Descriptors and Attributes",
+      "Version": "1.0",
+      "platforms": [
+        {
+          "Name": "Windows v10.0 Client ARM64 25H2 Full"
+        },
+        {
+          "Name": "Windows v10.0 Client x64 25H2 Full"
+        }
+      ]
+    },
+    {
+      "Id": "77de08b9-5428-4388-b5c3-71bb72d0861b",
+      "Name": "Dynamic Lighting LampArrayHid Device Tests FuzzRandom",
+      "Version": "1.0",
+      "platforms": [
+        {
+          "Name": "Windows v10.0 Client ARM64 25H2 Full"
+        },
+        {
+          "Name": "Windows v10.0 Client x64 25H2 Full"
+        }
+      ]
+    },
+    {
+      "Id": "de9b7427-7cc2-4226-869a-b9777798860c",
+      "Name": "Dynamic Lighting LampArrayHid Device Tests Lighting Effects",
+      "Version": "1.0",
+      "platforms": [
+        {
+          "Name": "Windows v10.0 Client ARM64 25H2 Full"
+        },
+        {
+          "Name": "Windows v10.0 Client x64 25H2 Full"
+        }
+      ]
+    },
+    {
+      "Id": "7881ef38-a64d-458a-bf5d-60b9c43f30fb",
+      "Name": "Dynamic Lighting LampArrayHid Device Tests StressRandom",
+      "Version": "1.0",
+      "platforms": [
+        {
+          "Name": "Windows v10.0 Client ARM64 25H2 Full"
+        },
+        {
+          "Name": "Windows v10.0 Client x64 25H2 Full"
+        }
+      ]
+    },
+    {
+      "Id": "93613fb7-fc72-46cf-9169-85d7703244d8",
+      "Name": "Dynamic Lighting LampArrayHid Device Tests StressShuffle",
+      "Version": "1.0",
+      "platforms": [
+        {
+          "Name": "Windows v10.0 Client ARM64 25H2 Full"
+        },
+        {
+          "Name": "Windows v10.0 Client x64 25H2 Full"
+        }
+      ]
+    },
+    {
+      "Id": "8be142ca-ac57-4bce-8262-cbf1f0ca9e2b",
+      "Name": "Dynamic Lighting LampArrayHid Device Tests UEX",
+      "Version": "1.0",
+      "platforms": [
+        {
+          "Name": "Windows v10.0 Client ARM64 25H2 Full"
+        },
+        {
+          "Name": "Windows v10.0 Client x64 25H2 Full"
+        }
+      ]
+    },
+    {
+      "Id": "8b387668-7895-4d09-abbc-727c59041227",
+      "Name": "Dynamic Lighting LampArrayHid Tests Descriptors and Attributes",
+      "Version": "1.0",
+      "platforms": [
+        {
+          "Name": "Windows v10.0 Client ARM64 25H2 Full"
+        },
+        {
+          "Name": "Windows v10.0 Client x64 25H2 Full"
+        }
+      ]
+    },
+    {
+      "Id": "93bf2869-9e34-47e7-93da-00e6dbd6bdc1",
+      "Name": "Dynamic Lighting LampArrayHid Tests FuzzRandom",
+      "Version": "1.0",
+      "platforms": [
+        {
+          "Name": "Windows v10.0 Client ARM64 25H2 Full"
+        },
+        {
+          "Name": "Windows v10.0 Client x64 25H2 Full"
+        }
+      ]
+    },
+    {
+      "Id": "ae6404f3-207e-4a07-9631-2b3c341b1f1f",
+      "Name": "Dynamic Lighting LampArrayHid Tests Lighting Effects",
+      "Version": "1.0",
+      "platforms": [
+        {
+          "Name": "Windows v10.0 Client ARM64 25H2 Full"
+        },
+        {
+          "Name": "Windows v10.0 Client x64 25H2 Full"
+        }
+      ]
+    },
+    {
+      "Id": "7abe11b2-da9b-4ef6-b52f-300359b209c7",
+      "Name": "Dynamic Lighting LampArrayHid Tests StressRandom",
+      "Version": "1.0",
+      "platforms": [
+        {
+          "Name": "Windows v10.0 Client ARM64 25H2 Full"
+        },
+        {
+          "Name": "Windows v10.0 Client x64 25H2 Full"
+        }
+      ]
+    },
+    {
+      "Id": "bb9d1411-c9ed-4ab4-b7a5-2a19cdc3d16a",
+      "Name": "Dynamic Lighting LampArrayHid Tests StressShuffle",
+      "Version": "1.0",
+      "platforms": [
+        {
+          "Name": "Windows v10.0 Client ARM64 25H2 Full"
+        },
+        {
+          "Name": "Windows v10.0 Client x64 25H2 Full"
+        }
+      ]
+    },
+    {
+      "Id": "cd620c10-62c5-4b45-abf2-fbb316d8fc46",
+      "Name": "Dynamic Lighting LampArrayHid Tests UEX",
+      "Version": "1.0",
+      "platforms": [
+        {
+          "Name": "Windows v10.0 Client ARM64 25H2 Full"
+        },
+        {
+          "Name": "Windows v10.0 Client x64 25H2 Full"
+        }
+      ]
+    }
+  ]
+}

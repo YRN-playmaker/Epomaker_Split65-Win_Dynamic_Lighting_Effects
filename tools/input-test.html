@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Split65 输入卡顿检查</title>
+<style>
+body{font:16px/1.65 system-ui,sans-serif;background:#f5f5f3;color:#202624;max-width:900px;margin:36px auto;padding:0 20px}h1{font-size:26px;margin-bottom:8px}p{margin:12px 0}button{font:inherit;padding:8px 16px;margin:0 8px 8px 0;cursor:pointer;border:1px solid #8e9992;border-radius:6px;background:white}button:disabled{opacity:.5;cursor:default}textarea{width:100%;box-sizing:border-box;font:20px/1.6 monospace;min-height:160px;padding:12px;border:2px solid #6a8676;border-radius:8px}pre{white-space:pre-wrap;background:#fff;padding:14px;border:1px solid #d5dcd6;max-height:300px;overflow:auto;font:13px/1.5 monospace}.status{background:#e6ede8;border-radius:8px;padding:12px}.note{color:#4a5d50;font-size:14px}
+</style>
+<h1>Split65 输入卡顿检查</h1>
+<p>先切换到英文输入。点击“开始”，在下方输入框快速交替打字，然后完全松开所有按键。分别用左侧与右侧按键重复几次，约一分钟后点击“结束并保存”。</p>
+<p>测试只记录这个页面收到的按键代码与时间，不记录输入框文字，不读取其他应用，也不联网。页面事件不能直接测量 USB 数据包或手指何时离开按键。</p>
+<div><button id="start">开始</button><button id="stop" disabled>结束并保存</button><button id="save" disabled>再次保存</button></div>
+<div class="status" id="status" role="status">尚未开始</div>
+<p><textarea id="typing" aria-label="输入测试区域" placeholder="点击开始后，在这里快速输入测试字符" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea></p>
+<p class="note">发生连字时先完全松手，等待几秒再点击“结束并保存”。如果整页无响应，可等恢复后保存。长按或重复计数本身不代表故障。</p>
+<pre id="preview">事件记录将在这里显示。</pre>
+<script>
+'use strict';
+const startButton=document.getElementById('start'),stopButton=document.getElementById('stop'),saveButton=document.getElementById('save');
+const field=document.getElementById('typing'),statusBox=document.getElementById('status'),preview=document.getElementById('preview');
+const held=new Map();
+let active=false,origin=0,lastTick=0,maxPause=0,downs=0,ups=0,repeats=0,rows=[],saved='';
+const LIMIT=20000;
+function append(kind,detail=''){
+  if(rows.length>=LIMIT){active=false;stopButton.disabled=false;statusBox.textContent='记录已达上限，请保存。';return;}
+  rows.push(`${(performance.now()-origin).toFixed(1)} ms\t${kind}\t${detail}`);
+}
+function finish(){
+  if(!origin)return;
+  if(active)append('END',`unreleased=${[...held.keys()].join(',')||'none'}`);
+  active=false;
+  saved=[
+    'Split65 focused-page input diagnosis v1',
+    'Started='+new Date(performance.timeOrigin+origin).toISOString(),
+    'Browser='+navigator.userAgent,
+    `keydown=${downs}; keyup=${ups}; repeated keydown=${repeats}; max timer excess=${maxPause.toFixed(1)} ms`,
+    'Only events in this page are recorded. Physical key release and USB reports are not measured.',
+    'TIMER_PAUSE measures delay of this page; background throttling/PC load can also cause it.',
+    'No input text is collected. No data was uploaded.',
+    '',...rows
+  ].join('\r\n');
+  stopButton.disabled=true;saveButton.disabled=false;startButton.disabled=false;update();
+}
+function download(){
+  if(!saved)return;
+  const url=URL.createObjectURL(new Blob([saved],{type:'text/plain;charset=utf-8'}));
+  const a=document.createElement('a');a.href=url;a.download='Split65-input-diagnosis.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function update(){
+  if(!origin)return;
+  statusBox.textContent=`${active?'记录中':'已结束'}｜按下 ${downs}｜松开 ${ups}｜重复 ${repeats}｜页面最大定时器延迟 ${maxPause.toFixed(0)} ms｜尚未收到松开：${[...held.keys()].join(', ')||'无'}`;
+  preview.textContent=rows.slice(-32).join('\n');
+}
+startButton.addEventListener('click',()=>{
+  rows=[];held.clear();downs=ups=repeats=0;maxPause=0;saved='';
+  origin=lastTick=performance.now();active=true;startButton.disabled=true;stopButton.disabled=false;saveButton.disabled=true;
+  append('START',`visibility=${document.visibilityState}; focused=${document.hasFocus()}`);field.value='';field.focus();update();
+});
+stopButton.addEventListener('click',()=>{finish();download();});
+saveButton.addEventListener('click',download);
+field.addEventListener('keydown',e=>{
+  if(!active)return;
+  ++downs;if(e.repeat)++repeats;
+  if(!held.has(e.code))held.set(e.code,performance.now());
+  const age=Math.max(0,performance.now()-e.timeStamp);
+  append('DOWN',`${e.code}; repeat=${e.repeat}; composing=${e.isComposing}; eventAge=${age.toFixed(1)} ms`);
+});
+// Record releases anywhere in this document; a mouse click can move focus.
+document.addEventListener('keyup',e=>{
+  if(!active)return;
+  ++ups;const began=held.get(e.code);held.delete(e.code);
+  append('UP',`${e.code}; pairedDuration=${began===undefined?'unknown':(performance.now()-began).toFixed(1)+' ms'}; composing=${e.isComposing}`);
+});
+for(const kind of ['compositionstart','compositionend'])field.addEventListener(kind,()=>{if(active)append(kind);});
+window.addEventListener('blur',()=>{if(active){append('WINDOW_BLUR','release pairing reset');held.clear();}});
+window.addEventListener('focus',()=>{if(active){lastTick=performance.now();append('WINDOW_FOCUS');}});
+document.addEventListener('visibilitychange',()=>{if(active){append('VISIBILITY',document.visibilityState);lastTick=performance.now();}});
+setInterval(()=>{
+  const now=performance.now();
+  if(active){
+    const excess=Math.max(0,now-lastTick-100);
+    if(document.visibilityState==='visible'&&document.hasFocus()){
+      maxPause=Math.max(maxPause,excess);
+      if(excess>150)append('TIMER_PAUSE',`excess=${excess.toFixed(1)} ms; pending=${[...held.keys()].join(',')||'none'}`);
+    }
+    lastTick=now;update();
+  }
+},100);
+</script>
+</html>

@@ -1,0 +1,76 @@
+diff --git a/quantum/rgb_matrix/rgb_matrix.c b/quantum/rgb_matrix/rgb_matrix.c
+index 80f8d6fe..83991d8b 100644
+--- a/quantum/rgb_matrix/rgb_matrix.c
++++ b/quantum/rgb_matrix/rgb_matrix.c
+@@ -408,7 +408,14 @@ static void rgb_task_flush(uint8_t effect) {
+     rgb_task_state = SYNCING;
+ }
+ 
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++#    include "lamparray.h"
++#endif
++
+ void rgb_matrix_task(void) {
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++    if (split65_lamp_render()) return;
++#endif
+     rgb_task_timers();
+ 
+     uint8_t effect = rgb_current_effect;
+diff --git a/tmk_core/protocol/chibios/usb_main.c b/tmk_core/protocol/chibios/usb_main.c
+index 5939e327..3cb2659d 100644
+--- a/tmk_core/protocol/chibios/usb_main.c
++++ b/tmk_core/protocol/chibios/usb_main.c
+@@ -165,6 +165,11 @@ void usb_event_queue_task(void) {
+     }
+ }
+ 
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++#    include "lamparray.h"
++#    include "protocol.h"
++#endif
++
+ /* Handles the USB driver global events. */
+ static void usb_event_cb(USBDriver *usbp, usbevent_t event) {
+     switch (event) {
+@@ -190,6 +195,9 @@ static void usb_event_cb(USBDriver *usbp, usbevent_t event) {
+         case USB_EVENT_UNCONFIGURED:
+             /* Falls into.*/
+         case USB_EVENT_RESET:
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++            split65_lamp_reset();
++#endif
+             usb_event_queue_enqueue(event);
+             chSysLockFromISR();
+             for (int i = 0; i < USB_ENDPOINT_IN_COUNT; i++) {
+@@ -249,6 +257,13 @@ static void set_led_transfer_cb(USBDriver *usbp) {
+ static bool usb_requests_hook_cb(USBDriver *usbp) {
+     usb_control_request_t *setup = (usb_control_request_t *)usbp->setup;
+ 
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++    if (setup->wIndex == SHARED_INTERFACE && setup->wValue.hbyte == 3 &&
++        setup->wValue.lbyte >= DL_REPORT_ATTRIBUTES && setup->wValue.lbyte <= DL_REPORT_CONTROL) {
++        return split65_lamp_usb_request(usbp);
++    }
++#endif
++
+     /* Handle HID class specific requests */
+     if ((setup->bmRequestType & (USB_RTYPE_TYPE_MASK | USB_RTYPE_RECIPIENT_MASK)) == (USB_RTYPE_TYPE_CLASS | USB_RTYPE_RECIPIENT_INTERFACE)) {
+         switch (setup->bmRequestType & USB_RTYPE_DIR_MASK) {
+diff --git a/tmk_core/protocol/usb_descriptor.c b/tmk_core/protocol/usb_descriptor.c
+index f83f3c6b..08ab14f0 100644
+--- a/tmk_core/protocol/usb_descriptor.c
++++ b/tmk_core/protocol/usb_descriptor.c
+@@ -451,6 +451,12 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM SharedReport[] = {
+     HID_RI_END_COLLECTION(0),
+ #endif
+ 
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++    0xA4, // HID Push: isolate LampArray globals
++#    include "descriptor.inc"
++    0xB4, // HID Pop
++#endif
++
+ #ifdef SHARED_EP_ENABLE
+ };
+ #endif

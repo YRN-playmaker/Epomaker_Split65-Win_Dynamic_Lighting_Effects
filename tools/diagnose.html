@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Split65 只读诊断</title>
+<style>
+body{font:16px/1.7 system-ui,sans-serif;max-width:860px;margin:45px auto;padding:0 22px;background:#f5f6f8;color:#182331}
+button{font:inherit;padding:9px 18px;border:0;border-radius:7px;background:#185bd8;color:white;cursor:pointer;margin-right:12px}
+button:disabled{opacity:.5;cursor:default}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;border:1px solid #d9dfe8;border-radius:9px;padding:20px;font:14px/1.7 ui-monospace,monospace}small{color:#4d5d71}
+</style>
+<h1>Split65 只读诊断</h1>
+<p>使用桌面版 Edge 或 Chrome 打开。两半正常连接，USB 插左半边；先关闭 Hub、VIA、OpenRGB 等占用设备的软件或网页。</p>
+<p>仅读取 VIA、灯效配置和修正版诊断信息，不改键、不写入配置、不刷机。</p>
+<button id="connect">连接并读取</button><button id="save" disabled>保存结果</button>
+<pre id="log" aria-live="polite">等待连接。选择 EPOMAKER Split65 的设备。</pre>
+<small>如果浏览器没有提供 WebHID，请使用包内 tools/windows_probe.py --via。此页面不上传数据。</small>
+<script>
+'use strict';
+const output = document.querySelector('#log');
+const connect = document.querySelector('#connect');
+const save = document.querySelector('#save');
+let device, pending;
+function log(text) { output.textContent += text + '\n'; }
+function hex(n, width = 2) { return n.toString(16).toUpperCase().padStart(width, '0'); }
+function onInput(event) {
+  const bytes = new Uint8Array(event.data.buffer, event.data.byteOffset, event.data.byteLength);
+  if (pending && (bytes[0] === pending.command || bytes[0] === 255)) {
+    const current = pending; pending = null; clearTimeout(current.timer);
+    if (bytes[0] === 255) current.reject(new Error('固件不支持该命令'));
+    else current.resolve(new Uint8Array(bytes));
+  }
+}
+async function query(command) {
+  if (pending) throw new Error('上一次读取尚未结束');
+  const packet = new Uint8Array(32); packet.set(command);
+  const response = new Promise((resolve, reject) => {
+    pending = {command: command[0], resolve, reject, timer: setTimeout(() => {
+      pending = null; reject(new Error('设备未在 2 秒内返回数据'));
+    }, 2000)};
+  });
+  // Attach a handler immediately, including when sendReport itself fails.
+  response.catch(() => {});
+  try { await device.sendReport(0, packet); }
+  catch (error) {
+    if (pending) { const current = pending; pending = null; clearTimeout(current.timer); current.reject(error); }
+    throw error;
+  }
+  return response;
+}
+function showDiagnostics(data) {
+  if (data.length < 25 || String.fromCharCode(...data.slice(1, 4)) !== 'DL2') throw new Error('无 DL2 诊断标记，可能仍在运行旧版或其他固件');
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  log(`本半固件：0x${hex(data[4], 4)}；${data[6] & 2 ? '物理左半' : '物理右半'}；${data[6] & 1 ? '主机' : '从机'}`);
+  log(`另一半同步协议：0x${hex(data[7], 4)}；${data[24] ? '物理左半' : '物理右半'}（兼容版本可不同）`);
+  log(`灯数：${data[8]}；RPC 成功/失败累计：${view.getUint32(10, true)} / ${view.getUint32(14, true)}`);
+  log(`LampArray 接管：${data[19] ? '否' : '是'}；旧协议串流接管：${data[20] ? '是' : '否'}`);
+  log(`内置灯效启用：${data[22]}；模式：${data[23]}；连接模式：${data[21]}（0=USB）`);
+  if (data[7] !== 0x44) log('提示：另一半尚无兼容协议应答。0.4.5 / 0.4.6 / 0.4.7 可与右侧 0.4.4 配对；请确认连接线及协议应答。');
+  return {success: view.getUint32(10, true), failed: view.getUint32(14, true)};
+}
+connect.addEventListener('click', async () => {
+  connect.disabled = true; output.textContent = ''; save.disabled = true;
+  try {
+    if (!navigator.hid) throw new Error('当前浏览器/页面未提供 WebHID；请使用桌面版 Edge 或 Chrome，或运行 Python 诊断。');
+    const devices = await navigator.hid.requestDevice({filters: [0xE4C6,0xE4C7].map(productId => ({vendorId: 0x342D, productId, usagePage: 0xFF60, usage: 0x61}))});
+    if (!devices.length) { log('未选择设备。'); return; }
+    device = devices[0];
+    if (!device.opened) await device.open();
+    device.addEventListener('inputreport', onInput);
+    log(`设备：${device.productName}；VID/PID ${hex(device.vendorId,4)}:${hex(device.productId,4)}`);
+    const reads = [
+      ['VIA 协议', [1], d => (d[1] << 8) | d[2]],
+      ['VIA 层数', [11], d => d[1]],
+      ['第 0 层 Esc 位置键码', [4, 0, 1, 0], d => '0x' + hex((d[4] << 8) | d[5], 4)],
+      ['RGB 亮度', [8, 3, 1], d => d[3]],
+      ['RGB 模式', [8, 3, 2], d => d[3]],
+      ['RGB 速度', [8, 3, 3], d => d[3]],
+      ['RGB 色相/饱和度', [8, 3, 4], d => d[3] + '/' + d[4]],
+    ];
+    for (const [label, command, format] of reads) {
+      try { log(`${label}：${format(await query(command))}`); }
+      catch (error) { log(`${label}：失败（${error.message}）`); }
+    }
+    try {
+      log('\n修正版固件诊断：');
+      const before = showDiagnostics(await query([0x30]));
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const after = await query([0x30]);
+      const view = new DataView(after.buffer, after.byteOffset, after.byteLength);
+      log(`约 1 秒内 RPC 成功/失败增量：${view.getUint32(10,true) - before.success} / ${view.getUint32(14,true) - before.failed}`);
+    } catch (error) { log('诊断扩展：' + error.message); }
+    try {
+      const summary = await query([0x31, 0]);
+      if (summary[2] === 84 && summary[3] === 82) {
+        const view = new DataView(summary.buffer, summary.byteOffset, summary.byteLength);
+        log(`\nUSB 初始化记录：总事件 ${view.getUint32(8,true)}，属性 GET ${view.getUint32(12,true)}，单灯 GET ${view.getUint32(16,true)}，属性请求 SET 完成 ${view.getUint32(20,true)}，未处理请求 ${view.getUint32(24,true)}`);
+        for (let i = 0; i < Math.min(summary[5],32); ++i) {
+          const event = await query([0x31,1,i]);
+          if (!event[3]) break;
+          const v = new DataView(event.buffer, event.byteOffset, event.byteLength);
+          log(`  t=${v.getUint16(4,true)} type=0x${hex(event[12])} req=0x${hex(event[13])} value=0x${hex(v.getUint16(6,true),4)} if=${v.getUint16(8,true)} len=${v.getUint16(10,true)} stage=${event[14]} received=${event[15]}`);
+        }
+        log('stage: 0=未处理，1=GET 应答，2=SET 接收已安排，3=SET 解析成功，4=SET 解析失败，5=Idle 请求');
+      }
+    } catch (error) { log('USB 请求记录不可读：' + error.message); }
+    log('\n读取完毕。请保存结果以便继续定位；读回成功不代表灯光已通过实物验证。');
+  } catch (error) { log('连接失败：' + error.message); }
+  finally {
+    if (device) {
+      device.removeEventListener('inputreport', onInput);
+      if (device.opened) await device.close().catch(() => {});
+    }
+    connect.disabled = false; save.disabled = false;
+  }
+});
+save.addEventListener('click', () => {
+  const url = URL.createObjectURL(new Blob([output.textContent], {type: 'text/plain;charset=utf-8'}));
+  const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'Split65-diagnosis.txt'; anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+</script>
+</html>

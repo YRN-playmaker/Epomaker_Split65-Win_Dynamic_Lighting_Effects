@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Split65 Windows 初始化轨迹</title>
+<style>body{max-width:900px;margin:36px auto;padding:0 20px;font:16px/1.7 system-ui,sans-serif;color:#192a26;background:#f4f6f3}h1{font-size:26px}button{font:inherit;padding:9px 16px;margin:0 10px 12px 0;cursor:pointer;border:1px solid #6f897e;border-radius:6px;background:#fff}button:disabled{opacity:.5;cursor:default}pre{font:13px/1.6 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;padding:18px;background:#fff;border:1px solid #ccd8d1;border-radius:8px}</style>
+<h1>Split65 Windows 初始化轨迹</h1>
+<p>支持 0.4.3 / 0.4.4 / 0.4.5 / 0.4.6 完整固件。用 USB 有线模式连接左半边，暂时拔掉接收器。关闭 OpenRGB、Hub、VIA 等控制器。先读取一次作为基线，打开 Windows“个性化 → 动态光效”后再读取；同一页面会显示两次之间新增的请求数。</p>
+<p>请下载此文件后，用桌面版 Edge / Chrome 打开。只读取固件状态及已记录的 USB 请求；不读灯位属性、不设置颜色、不写配置、不刷机，也不联网。</p>
+<button id="read">选择 Split65 并读取</button><button id="save" disabled>保存 TXT</button>
+<pre id="log" role="status">尚未读取。</pre>
+<script>
+'use strict';
+const readButton=document.getElementById('read'),saveButton=document.getElementById('save'),output=document.getElementById('log');
+let device,pending,previous;
+const hx=(n,w=2)=>n.toString(16).toUpperCase().padStart(w,'0');
+function line(s=''){output.textContent+=s+'\n';}
+function onInput(event){
+ if(event.device!==device||event.reportId!==0||!pending)return;
+ const data=new Uint8Array(event.data.buffer,event.data.byteOffset,event.data.byteLength);
+ if(data.length!==32||(data[0]!==pending.command&&data[0]!==255))return;
+ const wait=pending;pending=null;clearTimeout(wait.timer);
+ if(data[0]===255)wait.reject(new Error('固件未实现此诊断命令'));else wait.resolve(new Uint8Array(data));
+}
+async function query(command,operation=0,index=0){
+ if(pending)throw new Error('已有请求尚未完成');
+ const data=new Uint8Array(32);data.set([command,operation,index]);
+ const reply=new Promise((resolve,reject)=>{pending={command,resolve,reject,timer:setTimeout(()=>{pending=null;reject(new Error('请求 0x'+hx(command)+' 等待 3 秒未返回'));},3000)};});
+ reply.catch(()=>{});
+ try{await device.sendReport(0,data);}catch(error){if(pending){const wait=pending;pending=null;clearTimeout(wait.timer);wait.reject(error);}throw error;}
+ return reply;
+}
+function u32(data,offset){return new DataView(data.buffer,data.byteOffset,data.byteLength).getUint32(offset,true);}
+readButton.addEventListener('click',async()=>{
+ readButton.disabled=true;saveButton.disabled=true;output.textContent='';
+ line('Split65 USB trace via WebHID v2');line('Time='+new Date().toISOString());
+ try{
+  if(!navigator.hid)throw new Error('当前页面不提供 WebHID；请下载 HTML 并用桌面 Edge/Chrome 打开。');
+  const selected=await navigator.hid.requestDevice({filters:[0xE4C6,0xE4C7].map(productId=>({vendorId:0x342D,productId,usagePage:0xFF60,usage:0x61}))});
+  if(!selected.length){line('未选择设备。');return;}
+  device=selected[0];if(!device.opened)await device.open();device.addEventListener('inputreport',onInput);
+  line('Name='+device.productName+'; VID:PID='+hx(device.vendorId,4)+':'+hx(device.productId,4));
+  const d=await query(0x30);
+  if(String.fromCharCode(...d.slice(1,4))!=='DL2')throw new Error('没有 DL2 固件标记；先确认选择的是当前有线键盘。');
+  line('Firmware=0x'+hx(d[4])+'; master='+!!(d[6]&1)+'; left='+!!(d[6]&2)+'; mode='+d[21]+' (USB=0)');
+  line('Peer=0x'+hx(d[7])+'; peer left='+!!d[24]+'; lamps='+d[8]);
+  line('Split RPC success='+u32(d,10)+'; failure='+u32(d,14)+'; retry interval='+(d[25]*10)+' ms');
+  line('Autonomous='+d[19]+'; raw stream='+d[20]);
+  if(![0x43,0x44,0x45,0x46,0x47].includes(d[4])||d[7]!==Math.min(d[4],0x44))line('注意：两半版本不一致或尚无兼容应答。');
+  if(d[21]!==0||!(d[6]&1))line('注意：当前不是有线主机模式。');
+  const s=await query(0x31);
+  if(s[2]!==84||s[3]!==82)throw new Error('USB 轨迹标记错误');
+  line();line('USB total='+u32(s,8)+'; array GET='+u32(s,12)+'; lamp GET='+u32(s,16)+'; request SET parsed='+u32(s,20)+'; rejected='+u32(s,24)+'; cursor='+s[28]);
+  const current={revision:d[4],success:u32(d,10),failure:u32(d,14),total:u32(s,8),array:u32(s,12),lamp:u32(s,16),set:u32(s,20),rejected:u32(s,24)};
+  if(previous&&previous.revision===current.revision&&current.total>=previous.total&&current.success>=previous.success&&current.failure>=previous.failure){
+   line('Delta since previous read: '+['success','failure','total','array','lamp','set','rejected'].map(k=>k+'='+(current[k]-previous[k])).join('; '));
+  }else line('Baseline recorded; read again after opening Windows Dynamic Lighting.');
+  previous=current;
+  line('Stages: 0=unhandled, 1=GET armed (not completed), 2=SET armed, 3=SET parsed, 4=SET failed, 5=idle, 6=GET driver IN completed (firmware >=0x44)');
+  for(let i=0;i<Math.min(s[5],32);i++){
+   const e=await query(0x31,1,i);if(!e[3])break;
+   const v=new DataView(e.buffer,e.byteOffset,e.byteLength);
+   line('trace['+i+']: tick='+v.getUint16(4,true)+'; type=0x'+hx(e[12])+'; request=0x'+hx(e[13])+'; value=0x'+hx(v.getUint16(6,true),4)+'; interface='+v.getUint16(8,true)+'; length='+v.getUint16(10,true)+'; stage='+e[14]+'; bytes='+e[15]+(s[6]>=2?'; lamp='+v.getUint16(20,true)+'; report='+e[22]:''));
+  }
+  line();line('读取完成，请点击“保存 TXT”，把文件发回。');
+ }catch(error){line('读取失败：'+error.name+': '+error.message);}
+ finally{if(pending){clearTimeout(pending.timer);pending.reject(new Error('连接结束'));pending=null;}if(device){device.removeEventListener('inputreport',onInput);if(device.opened)await device.close().catch(()=>{});}device=null;readButton.disabled=false;saveButton.disabled=false;}
+});
+saveButton.addEventListener('click',()=>{const url=URL.createObjectURL(new Blob(['\uFEFF'+output.textContent],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='Split65-USB-Trace.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+</script>
+</html>

@@ -1,0 +1,208 @@
+diff --git a/quantum/rgb_matrix/rgb_matrix.c b/quantum/rgb_matrix/rgb_matrix.c
+index 80f8d6fe..83991d8b 100644
+--- a/quantum/rgb_matrix/rgb_matrix.c
++++ b/quantum/rgb_matrix/rgb_matrix.c
+@@ -408,7 +408,14 @@ static void rgb_task_flush(uint8_t effect) {
+     rgb_task_state = SYNCING;
+ }
+ 
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++#    include "lamparray.h"
++#endif
++
+ void rgb_matrix_task(void) {
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++    if (split65_lamp_render()) return;
++#endif
+     rgb_task_timers();
+ 
+     uint8_t effect = rgb_current_effect;
+diff --git a/tmk_core/protocol/chibios/usb_endpoints.c b/tmk_core/protocol/chibios/usb_endpoints.c
+index 58872673..0a092cb3 100644
+--- a/tmk_core/protocol/chibios/usb_endpoints.c
++++ b/tmk_core/protocol/chibios/usb_endpoints.c
+@@ -10,6 +10,9 @@
+ #include "report.h"
+ 
+ usb_endpoint_in_t usb_endpoints_in[USB_ENDPOINT_IN_COUNT] = {
++#if defined(SPLIT65_LAMPARRAY_ENABLE)
++    [USB_ENDPOINT_IN_LAMPARRAY] = QMK_USB_ENDPOINT_IN(USB_EP_MODE_TYPE_INTR, LAMPARRAY_EPSIZE, LAMPARRAY_IN_EPNUM, 1, NULL, NULL),
++#endif
+ // clang-format off
+ #if defined(SHARED_EP_ENABLE)
+     [USB_ENDPOINT_IN_SHARED] = QMK_USB_ENDPOINT_IN(USB_EP_MODE_TYPE_INTR, SHARED_EPSIZE, SHARED_IN_EPNUM, SHARED_IN_CAPACITY, NULL,
+@@ -103,6 +106,9 @@ usb_endpoint_in_t usb_endpoints_in[USB_ENDPOINT_IN_COUNT] = {
+ };
+ 
+ usb_endpoint_in_lut_t usb_endpoint_interface_lut[TOTAL_INTERFACES] = {
++#if defined(SPLIT65_LAMPARRAY_ENABLE)
++    [LAMPARRAY_INTERFACE] = USB_ENDPOINT_IN_LAMPARRAY,
++#endif
+ #if !defined(KEYBOARD_SHARED_EP)
+     [KEYBOARD_INTERFACE] = USB_ENDPOINT_IN_KEYBOARD,
+ #endif
+diff --git a/tmk_core/protocol/chibios/usb_endpoints.h b/tmk_core/protocol/chibios/usb_endpoints.h
+index 4662db39..d14b22ed 100644
+--- a/tmk_core/protocol/chibios/usb_endpoints.h
++++ b/tmk_core/protocol/chibios/usb_endpoints.h
+@@ -105,6 +105,9 @@ typedef enum {
+ #if defined(VIRTSER_ENABLE)
+     USB_ENDPOINT_IN_CDC_DATA,
+     USB_ENDPOINT_IN_CDC_SIGNALING,
++#endif
++#if defined(SPLIT65_LAMPARRAY_ENABLE)
++    USB_ENDPOINT_IN_LAMPARRAY,
+ #endif
+     USB_ENDPOINT_IN_COUNT,
+ /* All non shared endpoints have to be consequtive numbers starting from 0, so
+diff --git a/tmk_core/protocol/chibios/usb_main.c b/tmk_core/protocol/chibios/usb_main.c
+index 5939e327..32d840e6 100644
+--- a/tmk_core/protocol/chibios/usb_main.c
++++ b/tmk_core/protocol/chibios/usb_main.c
+@@ -165,6 +165,11 @@ void usb_event_queue_task(void) {
+     }
+ }
+ 
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++#    include "lamparray.h"
++#    include "protocol.h"
++#endif
++
+ /* Handles the USB driver global events. */
+ static void usb_event_cb(USBDriver *usbp, usbevent_t event) {
+     switch (event) {
+@@ -190,6 +195,9 @@ static void usb_event_cb(USBDriver *usbp, usbevent_t event) {
+         case USB_EVENT_UNCONFIGURED:
+             /* Falls into.*/
+         case USB_EVENT_RESET:
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++            split65_lamp_reset();
++#endif
+             usb_event_queue_enqueue(event);
+             chSysLockFromISR();
+             for (int i = 0; i < USB_ENDPOINT_IN_COUNT; i++) {
+@@ -249,6 +257,12 @@ static void set_led_transfer_cb(USBDriver *usbp) {
+ static bool usb_requests_hook_cb(USBDriver *usbp) {
+     usb_control_request_t *setup = (usb_control_request_t *)usbp->setup;
+ 
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++    if (setup->wIndex == LAMPARRAY_INTERFACE) {
++        return split65_lamp_usb_request(usbp);
++    }
++#endif
++
+     /* Handle HID class specific requests */
+     if ((setup->bmRequestType & (USB_RTYPE_TYPE_MASK | USB_RTYPE_RECIPIENT_MASK)) == (USB_RTYPE_TYPE_CLASS | USB_RTYPE_RECIPIENT_INTERFACE)) {
+         switch (setup->bmRequestType & USB_RTYPE_DIR_MASK) {
+diff --git a/tmk_core/protocol/usb_descriptor.c b/tmk_core/protocol/usb_descriptor.c
+index f83f3c6b..f4c49b35 100644
+--- a/tmk_core/protocol/usb_descriptor.c
++++ b/tmk_core/protocol/usb_descriptor.c
+@@ -455,6 +455,12 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM SharedReport[] = {
+ };
+ #endif
+ 
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++const USB_Descriptor_HIDReport_Datatype_t PROGMEM LampArrayReport[] = {
++#    include "descriptor.inc"
++};
++#endif
++
+ #ifdef RAW_ENABLE
+ const USB_Descriptor_HIDReport_Datatype_t PROGMEM RawReport[] = {
+     HID_RI_USAGE_PAGE(16, RAW_USAGE_PAGE), // Vendor Defined
+@@ -1165,6 +1171,25 @@ const USB_Descriptor_Configuration_t PROGMEM ConfigurationDescriptor = {
+         .PollingIntervalMS      = USB_POLLING_INTERVAL_MS
+     },
+ #endif
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++    .LampArray_Interface = {
++        .Header = {.Size = sizeof(USB_Descriptor_Interface_t), .Type = DTYPE_Interface},
++        .InterfaceNumber = LAMPARRAY_INTERFACE, .AlternateSetting = 0, .TotalEndpoints = 1,
++        .Class = HID_CSCP_HIDClass, .SubClass = HID_CSCP_NonBootSubclass,
++        .Protocol = HID_CSCP_NonBootProtocol, .InterfaceStrIndex = NO_DESCRIPTOR
++    },
++    .LampArray_HID = {
++        .Header = {.Size = sizeof(USB_HID_Descriptor_HID_t), .Type = HID_DTYPE_HID},
++        .HIDSpec = VERSION_BCD(1, 1, 1), .CountryCode = 0, .TotalReportDescriptors = 1,
++        .HIDReportType = HID_DTYPE_Report, .HIDReportLength = sizeof(LampArrayReport)
++    },
++    .LampArray_INEndpoint = {
++        .Header = {.Size = sizeof(USB_Descriptor_Endpoint_t), .Type = DTYPE_Endpoint},
++        .EndpointAddress = ENDPOINT_DIR_IN | LAMPARRAY_IN_EPNUM,
++        .Attributes = EP_TYPE_INTERRUPT | ENDPOINT_ATTR_NO_SYNC | ENDPOINT_USAGE_DATA,
++        .EndpointSize = LAMPARRAY_EPSIZE, .PollingIntervalMS = 1
++    },
++#endif
+ };
+ 
+ /*
+@@ -1317,6 +1342,12 @@ uint16_t get_usb_descriptor(const uint16_t wValue, const uint16_t wIndex, const
+             break;
+         case HID_DTYPE_HID:
+             switch (wIndex) {
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++                case LAMPARRAY_INTERFACE:
++                    Address = &ConfigurationDescriptor.LampArray_HID;
++                    Size = sizeof(USB_HID_Descriptor_HID_t);
++                    break;
++#endif
+ #ifndef KEYBOARD_SHARED_EP
+                 case KEYBOARD_INTERFACE:
+                     Address = &ConfigurationDescriptor.Keyboard_HID;
+@@ -1381,6 +1412,12 @@ uint16_t get_usb_descriptor(const uint16_t wValue, const uint16_t wIndex, const
+             break;
+         case HID_DTYPE_Report:
+             switch (wIndex) {
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++                case LAMPARRAY_INTERFACE:
++                    Address = &LampArrayReport;
++                    Size = sizeof(LampArrayReport);
++                    break;
++#endif
+ #ifndef KEYBOARD_SHARED_EP
+                 case KEYBOARD_INTERFACE:
+                     Address = &KeyboardReport;
+diff --git a/tmk_core/protocol/usb_descriptor.h b/tmk_core/protocol/usb_descriptor.h
+index 27058b7c..5c3835f3 100644
+--- a/tmk_core/protocol/usb_descriptor.h
++++ b/tmk_core/protocol/usb_descriptor.h
+@@ -151,6 +151,11 @@ typedef struct {
+     USB_HID_Descriptor_HID_t   Digitizer_HID;
+     USB_Descriptor_Endpoint_t  Digitizer_INEndpoint;
+ #endif
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++    USB_Descriptor_Interface_t LampArray_Interface;
++    USB_HID_Descriptor_HID_t LampArray_HID;
++    USB_Descriptor_Endpoint_t LampArray_INEndpoint;
++#endif
+ } USB_Descriptor_Configuration_t;
+ 
+ /*
+@@ -203,6 +208,9 @@ enum usb_interfaces {
+ 
+ #if defined(DIGITIZER_ENABLE) && !defined(DIGITIZER_SHARED_EP)
+     DIGITIZER_INTERFACE,
++#endif
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++    LAMPARRAY_INTERFACE,
+ #endif
+     TOTAL_INTERFACES
+ };
+@@ -284,6 +292,9 @@ enum usb_endpoints {
+ #        define DIGITIZER_IN_EPNUM SHARED_IN_EPNUM
+ #    endif
+ #endif
++#ifdef SPLIT65_LAMPARRAY_ENABLE
++    LAMPARRAY_IN_EPNUM = NEXT_EPNUM,
++#endif
+ };
+ 
+ #ifdef PROTOCOL_LUFA
+@@ -309,5 +320,6 @@ enum usb_endpoints {
+ #define CDC_EPSIZE 16
+ #define JOYSTICK_EPSIZE 8
+ #define DIGITIZER_EPSIZE 8
++#define LAMPARRAY_EPSIZE 8
+ 
+ uint16_t get_usb_descriptor(const uint16_t wValue, const uint16_t wIndex, const uint16_t wLength, const void** const DescriptorAddress);

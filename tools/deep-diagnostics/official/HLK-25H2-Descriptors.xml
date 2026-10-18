@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Playlist xmlns="http://schemas.microsoft.com/hlk/playlist/2014" Name="Split65 - Microsoft 25H2 Lighting descriptor tests" Version="1.0" Id="8b270a58-16be-4c72-9743-3308cb967fc1"><Test Id="653d223c-1ec7-440b-8e86-d23fb9286989" Name="Dynamic Lighting LampArrayHid Device Tests Descriptors and Attributes" Version="1.0">
+    <OSPlatform Name="Windows v10.0 Client ARM64 25H2 Full" />
+    <OSPlatform Name="Windows v10.0 Client x64 25H2 Full" />
+  </Test>
+  <Test Id="8b387668-7895-4d09-abbc-727c59041227" Name="Dynamic Lighting LampArrayHid Tests Descriptors and Attributes" Version="1.0">
+    <OSPlatform Name="Windows v10.0 Client ARM64 25H2 Full" />
+    <OSPlatform Name="Windows v10.0 Client x64 25H2 Full" />
+  </Test>
+  </Playlist>
