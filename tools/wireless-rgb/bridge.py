@@ -25,7 +25,7 @@ REJECTED = 253
 
 
 class WirelessLink:
-    def __init__(self, timeout=2.0):
+    def __init__(self, timeout=2.0, window=4):
         receivers = P.find_receiver()
         if not receivers:
             raise SystemExit("no Split65 receiver found (usage 0xFF60 collection missing)")
@@ -34,6 +34,7 @@ class WirelessLink:
         self.attrs = attrs
         self.caps = caps
         self.timeout = timeout
+        self.window = window
         self.handle = P.open_device(path)
         if self.handle in (0, -1):
             raise SystemExit("could not open the raw HID collection")
@@ -46,6 +47,11 @@ class WirelessLink:
             self.send(bytes([0x26] + [0] * 31), expect_reply=False)
         finally:
             P.kernel32.CloseHandle(self.handle)
+
+    def _flush(self):
+        """Discard queued reports so a late ack cannot be mistaken for the next one."""
+        while P.read_report(self.handle, 64, 5) is not None:
+            pass
 
     def send(self, payload, expect_reply=True):
         ok, info = P.write_report(self.handle, b"\x00" + payload)
@@ -84,13 +90,47 @@ class WirelessLink:
 
     def keepalive(self, force=False):
         now = time.time()
-        if force or now - self.last_lease >= 1.0:
-            self.send(bytes([0x25] + [0] * 31))
-            self.last_lease = now
+        if not force and now - self.last_lease < 1.0:
+            return
+        self._flush()
+        for attempt in range(3):
+            try:
+                self.send(bytes([0x25] + [0] * 31))
+                self.last_lease = now
+                return
+            except RuntimeError:
+                if attempt == 2:
+                    raise
+                time.sleep(0.02)
 
-    def send_frame(self, rgb):
+    def _drain(self, command, want, timeout):
+        """Collect up to `want` acknowledgements for `command`."""
+        got = 0
+        deadline = time.time() + timeout
+        while got < want and time.time() < deadline:
+            chunk = P.read_report(self.handle, 64, 150)
+            if not chunk:
+                continue
+            body = chunk[1:] if len(chunk) == 33 else chunk
+            if body[0] != command:
+                continue
+            if len(body) > 1 and body[1] == REJECTED:
+                raise RuntimeError("firmware rejected the stream (mode or link)")
+            got += 1
+        return got
+
+    def send_frame(self, rgb, window=None):
+        """Send one 68-lamp frame.
+
+        The link acknowledges every packet and the receiver round trip is about
+        20 ms, so a strictly serial frame costs ~180 ms. Keeping up to four
+        packets in flight lifts that to ~9 fps; deeper windows lose
+        acknowledgements, and on loss this falls back to one packet at a time.
+        """
         if len(rgb) != LAMPS * 3:
             raise ValueError("frame must be %d bytes" % (LAMPS * 3))
+        window = max(1, window or self.window)
+        packets = []
         for first in range(0, LAMPS, LAMPS_PER_PACKET):
             count = min(LAMPS_PER_PACKET, LAMPS - first)
             payload = bytearray(32)
@@ -98,7 +138,29 @@ class WirelessLink:
             payload[1] = first
             payload[2] = count
             payload[3:3 + count * 3] = rgb[first * 3:(first + count) * 3]
-            self.send(bytes(payload))
+            packets.append(bytes(payload))
+
+        sent = 0
+        while sent < len(packets):
+            batch = packets[sent:sent + window]
+            for payload in batch:
+                ok, info = P.write_report(self.handle, b"\x00" + payload)
+                if not ok:
+                    raise RuntimeError("write failed (%s)" % info)
+                self.packets += 1
+            sent += len(batch)
+            got = self._drain(0x24, len(batch), 0.15)
+            if got < len(batch):
+                # One lost ack must not cost a full timeout: resend the batch
+                # once, then move on — the next frame overwrites the colours.
+                for payload in batch:
+                    ok, info = P.write_report(self.handle, b"\x00" + payload)
+                    if not ok:
+                        raise RuntimeError("write failed (%s)" % info)
+                    self.packets += 1
+                self._drain(0x24, len(batch) - got, 0.15)
+                window = 1
+
         self.frames += 1
         self.keepalive()
 
