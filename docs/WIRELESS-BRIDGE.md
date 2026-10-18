@@ -56,7 +56,19 @@ Windows 动态照明只枚举 HID 描述符中声明了 LampArray 用途页的�
 
 `0x24/0x25/0x26` 命令走接收器的 `0xFF60/0x61` Raw HID（33 字节报文，report id 0），与 Hub 的 VIA 通道 3 不冲突：Hub 灯效参数用 `07 03 xx` 等前缀，改键仍走原有 VIA 命令，v0.4.8 未改动 PID、描述符和 0x44 分体协议。
 
-本轮用只读 `0x30` 状态查询探测该通道：33 字节写入成功，3 秒内没有收到输入报告。可能原因：键盘未切到 2.4G、未与当前接收器配对、或尚未刷入 v0.4.8。需要用 `tools/wireless-rgb/` 页面或同构探测脚本在实机上复核。
+2026-10-18 实机读取 `0x30` 应答（`tools/wireless-rgb/probe_status.py`，只读）：
+
+```
+device  : VID 342D PID E4C6 bcd 2001
+raw hid : in=33 out=33 usage 0xFF60/0x0061
+reply   : 00 30 44 4c 32 48 02 03 44 44 00 60 00 00 00 01 00 00 00 00 01 00 06 01 0d 00 01 01 00 03 02 00 00
+signature 'DL2'  revision 0x48  lamps 68  device 6 (2.4G)  raw protocol 1  lease 3s  module state 2
+```
+
+结论：左侧 v0.4.8、2.4G 链路、接收器 Raw HID 转发均正常，host→键盘的逐灯通道可用。缺的只是 Windows 端的 LampArray 呈现。
+
+实现提示：早期探测脚本在读超时后直接丢弃 OVERLAPPED 读请求，残留的 pending read 会吞掉随后的应答，表现为「写入成功但没有回复」。现在的实现会在超时后 `CancelIoEx` 并等待取消完成。
+
 
 ## 下一步（待确认）
 
