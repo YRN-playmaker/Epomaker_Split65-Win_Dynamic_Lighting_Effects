@@ -3,6 +3,9 @@
 
 #include "quantum.h"
 #include "wireless.h"
+#ifdef SPLIT65_LAMPARRAY_ENABLE
+#    include "lamparray.h"
+#endif
 
 #ifndef WLS_INQUIRY_BAT_TIME
 #    define WLS_INQUIRY_BAT_TIME 3000
@@ -189,6 +192,9 @@ void wireless_devs_change(uint8_t old_devs, uint8_t new_devs, bool reset) {
     }
 
     wls_devs = new_devs;
+#ifdef SPLIT65_LAMPARRAY_ENABLE
+    if (old_devs != new_devs || reset) split65_lamp_mode_changed();
+#endif
     last_matrix_activity_trigger();
 
     md_devs_change(new_devs, reset);

@@ -36,6 +36,11 @@ static uint16_t send_sequence, receive_sequence;
 static uint8_t send_offset, receive_offset;
 static bool sending, send_active;
 static bool raw_active;
+static uint8_t raw_device;
+static uint32_t raw_last_packet;
+// Wireless clients renew with RGB data or 0x25, at least once per second.
+// A closed controller must release the battery-powered keyboard to native RGB.
+#define RAW_WIRELESS_TIMEOUT_MS 3000
 static uint32_t rpc_success, rpc_failure;
 static frame_ack_t remote_ack;
 static native_state_t native_pending;
@@ -111,8 +116,25 @@ void split65_lamp_usb_diagnostics(uint8_t *data) {
 void split65_lamp_reset(void) {
     state.autonomous = true;
     state.requested_lamp = 0;
-    raw_active = false;
+    // An unrelated USB reset must not cancel an active radio stream.
+    if (raw_device == DEVS_USB) raw_active = false;
     ++state.generation;
+}
+
+void split65_lamp_mode_changed(void) {
+    split65_lamp_reset();
+    raw_active = false;
+}
+
+static bool raw_transport_ready(uint8_t device) {
+    if (device == DEVS_USB) return USB_DRIVER.state == USB_ACTIVE;
+    return device == DEVS_2G4 && *md_getp_state() == MD_STATE_CONNECTED;
+}
+
+static bool raw_stream_live(void) {
+    return raw_active && raw_device == wireless_get_current_devs() &&
+        raw_transport_ready(raw_device) &&
+        (raw_device == DEVS_USB || timer_elapsed32(raw_last_packet) < RAW_WIRELESS_TIMEOUT_MS);
 }
 
 static void feature_sent(USBDriver *driver) {
@@ -192,20 +214,34 @@ void split65_lamp_init(void) {
 
 bool split65_lamp_active(void) {
     chSysLock();
-    bool active = is_keyboard_master() ? local_active && (!state.autonomous || raw_active) : remote_active;
+    bool wired = wireless_get_current_devs() == DEVS_USB && USB_DRIVER.state == USB_ACTIVE;
+    bool active = is_keyboard_master() ? (wired && !state.autonomous) || raw_stream_live() : remote_active;
     chSysUnlock();
-    if (is_keyboard_master()) active = active && USB_DRIVER.state == USB_ACTIVE;
     return active;
 }
 
 bool split65_lamp_stream(uint8_t start, uint8_t count, const uint8_t *rgb) {
-    if (count > 9 || (unsigned)start + count > DL_LAMP_COUNT) return false;
+    const uint8_t device = wireless_get_current_devs();
+    if (!count || count > 9 || (unsigned)start + count > DL_LAMP_COUNT || !raw_transport_ready(device)) return false;
+    chSysLock();
     memcpy(raw_frame + start, rgb, count * sizeof(pixel_t));
+    raw_device = device;
+    raw_last_packet = timer_read32();
     raw_active = true;
+    chSysUnlock();
     return true;
 }
 
-void split65_lamp_raw_enable(bool enable) { raw_active = enable; }
+bool split65_lamp_raw_enable(bool enable) {
+    const uint8_t device = wireless_get_current_devs();
+    if (enable && !raw_transport_ready(device)) return false;
+    chSysLock();
+    raw_active = enable;
+    raw_device = device;
+    raw_last_packet = timer_read32();
+    chSysUnlock();
+    return true;
+}
 
 void split65_lamp_diagnostics(uint8_t *data) {
     memset(data, 0, 32);
@@ -224,6 +260,10 @@ void split65_lamp_diagnostics(uint8_t *data) {
     data[22] = rgb_matrix_is_enabled(); data[23] = rgb_matrix_get_mode();
     data[24] = remote_ack.left;
     data[25] = rpc_interval / 10;
+    data[26] = 1; // Raw stream protocol: USB + 2.4G, renewable wireless lease.
+    data[27] = raw_device;
+    data[28] = RAW_WIRELESS_TIMEOUT_MS / 1000;
+    data[29] = *md_getp_state();
 }
 
 void split65_lamp_suspend_slave(void) {
@@ -267,13 +307,14 @@ void split65_lamp_task(void) {
     dl_color_t snapshot[DL_LAMP_COUNT];
     bool lamp_owned;
     chSysLock();
-    lamp_owned = !state.autonomous;
+    lamp_owned = !state.autonomous && wireless_get_current_devs() == DEVS_USB && USB_DRIVER.state == USB_ACTIVE;
+    if (raw_active && !raw_stream_live()) raw_active = false;
     local_active = lamp_owned || raw_active;
     memcpy(snapshot, state.visible, sizeof(snapshot));
+    memcpy(local_frame, raw_frame, sizeof(local_frame));
     chSysUnlock();
-    local_active = local_active && wireless_get_current_devs() == DEVS_USB && USB_DRIVER.state == USB_ACTIVE;
     for (unsigned i = 0; i < DL_LAMP_COUNT; ++i) {
-        const dl_color_t c = lamp_owned ? snapshot[i] : (dl_color_t){raw_frame[i].r, raw_frame[i].g, raw_frame[i].b, 255};
+        const dl_color_t c = lamp_owned ? snapshot[i] : (dl_color_t){local_frame[i].r, local_frame[i].g, local_frame[i].b, 255};
         const unsigned limit = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
         local_frame[i] = (pixel_t){(uint32_t)c.r * limit / 255,
                                   (uint32_t)c.g * limit / 255,

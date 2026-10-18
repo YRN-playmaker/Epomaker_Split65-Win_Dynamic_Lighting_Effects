@@ -22,6 +22,36 @@ def function(path, declaration):
 
 converter = function(root / 'linker/wireless/wireless.c', 'void wireless_send_nkro(report_nkro_t *report)')
 retry = function(root / 'linker/wireless/module.c', 'static void md_send_pkt_task(void)')
+mode_change = function(root / 'linker/wireless/wireless.c', 'void wireless_devs_change(uint8_t old_devs, uint8_t new_devs, bool reset)')
+mode_test = r'''
+#include <stdint.h>
+#include <stdbool.h>
+#include <assert.h>
+#define SPLIT65_LAMPARRAY_ENABLE
+enum {DEVS_USB=0,TRANSPORT_WLS=1,TRANSPORT_USB=2,MD_STATE_DISCONNECTED=0};
+static uint8_t wls_devs,radio_state,indicator;
+static unsigned releases,transports,expected_new;
+static uint8_t *md_getp_state(void){return &radio_state;}
+static uint8_t *md_getp_indicator(void){return &indicator;}
+static void set_transport(unsigned mode){assert(mode==(expected_new==DEVS_USB?TRANSPORT_USB:TRANSPORT_WLS));++transports;}
+static void split65_lamp_mode_changed(void){assert(wls_devs==expected_new);++releases;}
+static void last_matrix_activity_trigger(void){}
+static void md_devs_change(uint8_t mode,bool reset){(void)reset;assert(mode==expected_new);}
+static void wireless_devs_change_kb(uint8_t a,uint8_t b,bool c){(void)a;(void)b;(void)c;}
+static void wireless_devs_change_user(uint8_t a,uint8_t b,bool c){(void)a;(void)b;(void)c;}
+FUNCTION
+int main(void){
+    const uint8_t modes[]={0,6,6,1,6,0,0,3};
+    unsigned expected_releases=0,expected_transports=0;
+    for(unsigned i=0;i<10000;++i){
+        uint8_t old=wls_devs,new=modes[i%8];bool reset=(i%7)==0;
+        expected_new=new;expected_releases+=old!=new||reset;
+        expected_transports+=(old==0)!=(new==0);
+        wireless_devs_change(old,new,reset);
+        assert(releases==expected_releases&&transports==expected_transports);
+    }
+}
+'''.replace('FUNCTION', mode_change)
 conversion_test = r'''
 #include "report.h"
 #include <assert.h>
@@ -82,7 +112,7 @@ int main(void){
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory)
     failed = False
-    for name, source, flags in [('conversion', conversion_test, []), ('conversion-shared', conversion_test, ['-DKEYBOARD_SHARED_EP']), ('retry', retry_test, [])]:
+    for name, source, flags in [('conversion', conversion_test, []), ('conversion-shared', conversion_test, ['-DKEYBOARD_SHARED_EP']), ('retry', retry_test, []), ('mode-light-release', mode_test, [])]:
         (path / (name + '.c')).write_text(source)
         subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Wno-unused-function', '-g',
                         '-fsanitize=address,undefined', '-DNKRO_ENABLE', *flags,

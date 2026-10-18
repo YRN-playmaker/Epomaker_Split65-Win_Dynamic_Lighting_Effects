@@ -3,7 +3,7 @@ include keyboards/$(KEYBOARD)/rgb_record/rgb_record.mk
 include keyboards/$(KEYBOARD)/wls/wls.mk
 include keyboards/$(KEYBOARD)/linker/wireless/wireless.mk
 
-# Windows Dynamic Lighting (USB only)
+# Windows LampArray (USB) and Raw HID RGB streaming (USB / 2.4G)
 DYNAMIC_LIGHTING_ENABLE ?= yes
 ifeq ($(DYNAMIC_LIGHTING_ENABLE),yes)
 OPT_DEFS += -DSPLIT65_LAMPARRAY_ENABLE

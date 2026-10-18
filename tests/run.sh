@@ -19,6 +19,9 @@ python3 "$project_dir/tests/check_hardware_config.py"
 python3 "$project_dir/tests/check_module.py"
 python3 "$project_dir/tests/check_split_commands.py"
 python3 "$project_dir/tests/check_split_wakeup.py"
+if command -v node >/dev/null 2>&1; then
+    node "$project_dir/tests/check_wireless_rgb.cjs"
+fi
 if [[ $# -gt 0 ]]; then
     python3 "$project_dir/tests/check_wb32_ep0.py" "$1"
     python3 "$project_dir/tests/check_wireless_state.py" "$1"

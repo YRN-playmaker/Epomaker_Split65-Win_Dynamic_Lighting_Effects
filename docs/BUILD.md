@@ -17,6 +17,7 @@ bash tools/build.sh /absolute/path/to/a/dedicated/qmk-build
 
 ```sh
 bash tests/run.sh /absolute/path/to/qmk-build
+node tests/check_wireless_rgb.cjs
 python3 tests/check_linked_usb.py /absolute/path/to/qmk-build
 ```
 

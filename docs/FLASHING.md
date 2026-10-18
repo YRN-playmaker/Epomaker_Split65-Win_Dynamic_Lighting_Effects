@@ -1,3 +1,13 @@
+# 0.4.8 候选刷写
+
+当前双侧 0.4.7 的用户：本轮只升级左侧为 firmware/split65-dynamic-lighting-v0.4.8.bin，右侧保留 0.4.7。协议仍为 0x44。无需编译环境；刷写工具与 WB32 DFU 操作同以前。若两侧都升级，使用同一 BIN。
+
+本轮提供的是 2.4G Raw RGB 逐灯控制候选；Windows 无线自动识别尚未实现。刷完用 tools/wireless-rgb/Start-Wireless-RGB.html 验证。
+
+回退文件 firmware/split65-dynamic-lighting-v0.4.7.bin 与此前交付字节一致。只需回退本轮更新的左侧。以下保留原 0.4.7 的硬件与驱动说明。
+
+---
+
 # 固件与刷写
 
 当前已安装两侧 v0.4.7 的用户无需重新刷写。本次整理没有修改 BIN；Chroma 串灯的有效处理是移动应用内设备布局，见 [Chroma 说明](CHROMA.md)。

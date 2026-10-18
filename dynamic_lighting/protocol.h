@@ -13,9 +13,9 @@
 #define DL_REPORT_CONTROL 0x25
 #define DL_MAX_REPORT_SIZE 51
 #define DL_INTERVAL_US 100000
-#define DL_FIRMWARE_REVISION 0x47
+#define DL_FIRMWARE_REVISION 0x48
 // USB compatibility changes do not change the inter-half packet layout.
-// A 0.4.7 host remains compatible with the user's working 0.4.4 target.
+// Keep the existing inter-half wire format; wireless ownership is host-side.
 #define DL_SPLIT_PROTOCOL_REVISION 0x44
 
 typedef struct { uint8_t r, g, b, intensity; } dl_color_t;

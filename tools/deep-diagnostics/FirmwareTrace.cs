@@ -92,7 +92,7 @@ public sealed class Split65HidProbe {
         return payload;
     }
     void ReadRawDiagnostics(string path) {
-        // Only called after bcdDevice/capabilities identify our 0.4.2..0.4.7 Raw
+        // Only called after bcdDevice/capabilities identify our 0.4.2..0.4.8 Raw
         // interface. These commands only read RAM; never send trace-clear,
         // keymap, RGB, EEPROM or bootloader commands.
         using (SafeFileHandle handle = CreateFile(path, 0xC0000000, 3, IntPtr.Zero, 3, 0x40000000, IntPtr.Zero)) {
@@ -150,7 +150,7 @@ public sealed class Split65HidProbe {
                 if (status != 0x110000) throw new InvalidOperationException("HidP_GetCaps status=0x" + status.ToString("X8"));
                 Lines.Enqueue(String.Format("Caps page/usage={0:X4}:{1:X4}; input/output/feature bytes={2}/{3}/{4}; feature value caps={5}; links={6}", caps.UsagePage, caps.Usage, caps.InputLength, caps.OutputLength, caps.FeatureLength, caps.FeatureValues, caps.Links));
                 if (!metadata) {
-                    if ((attributes.Version == 0x42 || attributes.Version == 0x43 || attributes.Version == 0x44 || attributes.Version == 0x45 || attributes.Version == 0x46 || attributes.Version == 0x47) && caps.UsagePage == 0xFF60 && caps.Usage == 0x61 && caps.InputLength == 33 && caps.OutputLength == 33) {
+                    if ((attributes.Version == 0x42 || attributes.Version == 0x43 || attributes.Version == 0x44 || attributes.Version == 0x45 || attributes.Version == 0x46 || attributes.Version == 0x47 || attributes.Version == 0x48) && caps.UsagePage == 0xFF60 && caps.Usage == 0x61 && caps.InputLength == 33 && caps.OutputLength == 33) {
                         RawPaths.Enqueue(path);
                         try { ReadRawDiagnostics(path); }
                         catch (Exception e) { Lines.Enqueue("Raw diagnostics: " + ErrorDetail(e)); }

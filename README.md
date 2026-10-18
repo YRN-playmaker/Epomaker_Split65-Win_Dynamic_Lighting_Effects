@@ -6,37 +6,46 @@
 
 ## 简体中文
 
-基于 EPOMAKER Split65 的 QMK 实验固件，为 WB32FQ95 键盘增加原生 HID LampArray 支持。参考微软 RP2040 示例，使用标准 Windows.Devices.Lights 接口，无额外 Windows 驱动。
+基于 EPOMAKER Split65 / WB32FQ95 的 QMK 实验固件，参考微软 RP2040 LampArray 示例。
 
-**当前 v0.4.7 实验版：Windows 原生识别及基本灯光已有用户实测；Chroma 串灯通过分离设备布局得到用户确认解决。本次整理没有改动固件镜像。**
+**v0.4.8 候选版：新增 2.4G Raw HID 逐灯 RGB 串流。有线 Windows 动态照明保留。无线接收器自动接入 Windows 动态照明的桥接尚未实现，本版尚无硬件实测。**
 
-| 功能 | 状态 |
+v0.4.7 是已有用户验证的基线：退出 OpenRGB 后 Windows 能识别；Chroma 串灯通过分离鼠标布局消失。v0.4.8 保持相同 VID/PID、灯位、LampArray 描述符及 0x44 分体协议，USB 固件版本改为 0048。
+
+| 能力 | v0.4.8 状态 |
 | --- | --- |
-| USB 有线 Windows 动态照明 | 用户结束 OpenRGB 后台进程后确认识别，基本亮灭可用 |
-| 68 灯及左右同步 | 已实现，用户报告内置灯效切换可用；全灯逐色与长时回归未完成 |
-| 输入/右侧休眠恢复 | 已实现，右侧休眠修复有用户确认 |
-| Chroma Studio | 用户当前配置中，移开鼠标布局后串灯消失；其他效果及长期运行未完整验证 |
-| 2.4G / 蓝牙动态照明 | 未实现；常规无线输入代码保留 |
-| VIA / EPOMAKER Hub | 原有路径保留，新实验 PID 可能不匹配旧设备过滤；未完整验证 |
-| BIOS / UEFI | 当前非 Boot 接口，未保证可用 |
+| 有线 Windows 动态照明 | 沿用 v0.4.7，软件与链接镜像回归通过，当前版待实测 |
+| 2.4G 全灯/单灯 RGB 串流 | 已实现，复用现有 Raw HID，无线回复、双侧同步和失联释放有软件检查 |
+| 2.4G 原生 Windows 动态照明枚举 | 尚未实现接收器接口或 Windows 桥接；不能仅刷本版后宣称可识别 |
+| Hub 2.4G 内置灯效参数控制 | 原有 VIA 路径保留；用户确认 v0.4.7 可用，0.4.8 待实测 |
+| 输入与休眠 | 保留先前修复，回归检查通过，当前版本长期硬件回归未完成 |
+| 蓝牙 RGB 串流 | 本版明确拒绝，避免在未验证的通道假报成功 |
+| VIA / Hub、BIOS/UEFI | 实验 PID 过滤、非 Boot 接口等限制仍见已知问题 |
 
-正常使用无需搭建编译环境，使用 `firmware/split65-dynamic-lighting-v0.4.7.bin` 即可。两半使用同一 BIN，硬件引脚自动区分左右。已安装两侧 v0.4.7 的用户无需为本次整理重刷。
+### 使用
 
-使用 Windows 动态照明前完全退出 OpenRGB 后台，再查看「设置 → 个性化 → 动态照明」。使用 Chroma 时，若部分按键带着鼠标变色，请按 [Chroma 布局说明](docs/CHROMA.md) 移开鼠标设备；视觉外框分开仍可能存在逻辑灯位重叠。
+无需搭建编译环境，推荐候选文件：`firmware/split65-dynamic-lighting-v0.4.8.bin`。
 
-- [已知问题与验证边界](docs/KNOWN-ISSUES.md)
-- [Chroma 布局与串灯处理](docs/CHROMA.md)
-- [版本说明](docs/RELEASE-NOTES.md)
-- [构建方法](docs/BUILD.md)
-- [固件与刷写说明](docs/FLASHING.md)
-- [依赖版本与镜像校验](docs/build-manifest.json)
-- [固件 SHA256](firmware/SHA256SUMS)
+当前双侧 v0.4.7 的用户，本轮只升级左侧即可；右侧保留 0.4.7，分体协议未变。两侧若均更新也使用同一 BIN，由硬件引脚区分左右。保留 v0.4.7 以便回退。
+
+无线验证：保留整个 `tools/wireless-rgb/` 文件夹，使用 Edge/Chrome 打开 `Start-Wireless-RGB.html`，按页内步骤切到 2.4G 并移除键盘直连数据线。连接时先读取固件信息，确认 0.4.8 后才开放颜色按钮。逐包确认、低速发送，客户端每秒续期；3 秒无数据、断连或模式切换会释放无线控制。测试页不会安装驱动、修改按键或写灯光 EEPROM。
+
+- [0.4.8 版本说明](docs/0.4.8-Wireless-RGB.md)
+- [刷写与回退](docs/FLASHING.md)
+- [Chroma 布局处理](docs/CHROMA.md)
+- [无线协议调查](docs/WIRELESS.md)
+- [无线动态照明桥接评估](docs/WIRELESS-BRIDGE.md)
+- [已知问题](docs/KNOWN-ISSUES.md)
+- [构建](docs/BUILD.md) / [验证范围](docs/LOCAL-VALIDATION.md)
+- [构建清单](docs/build-manifest.json) / [固件 SHA256](firmware/SHA256SUMS)
+
+有线 Windows 动态照明使用前，完全退出 OpenRGB 后台；Chroma 保持鼠标与键盘的逻辑灯位分离。当前没有 VHF、SYS、INF 或 Windows 安装器。
 
 ### 源码结构
 
-`dynamic_lighting/` 包含协议、68 灯位表、分体同步及 QMK/WB32 补丁。`linker/wireless/`、`wls/` 保留社区无线支持及输入释放/休眠修复。`tests/` 包含协议、输入、旧右侧接收回调及描述符检查。`tools/` 包含构建和诊断工具，不会自动刷写设备。
+`dynamic_lighting/`：LampArray 协议、68 灯位、分体同步和兼容 Raw RGB。`linker/wireless/`：现有无线输入与 Raw HID 通道。`tools/wireless-rgb/`：候选版无线验证页。`tests/`：生产函数、协议、输入、休眠和客户端模拟检查。
 
-LampArray 使用报告 ID 0x20–0x25，键盘/鼠标/多媒体/NKRO/LampArray 共享非 Boot HID 接口 0，VIA Raw HID 为接口 1。USB 342D:E4C7 是临时实验身份，不声称由厂商正式分配。没有 VHF、SYS、INF 或 Windows 安装器。
+LampArray 报告 ID 0x20–0x25，与键盘/鼠标/多媒体/NKRO 共用非 Boot HID 接口 0；VIA Raw HID 为接口 1。Raw HID 负载中的 0x24/0x25/0x26 是另一接口内的命令，不与 LampArray 报告 ID 混用。342D:E4C7 为临时实验身份。
 
 ### 来源与许可
 
@@ -57,39 +66,48 @@ LampArray 使用报告 ID 0x20–0x25，键盘/鼠标/多媒体/NKRO/LampArray �
 
 ## English
 
-Experimental QMK firmware for the EPOMAKER Split65 that adds native HID LampArray support to the WB32FQ95 keyboard. It follows Microsoft's RP2040 sample and uses the standard `Windows.Devices.Lights` API, so no extra Windows driver is needed.
+Experimental QMK firmware for the EPOMAKER Split65 / WB32FQ95, following Microsoft's RP2040 LampArray sample.
 
-**Current v0.4.7 experimental build: native Windows recognition and basic lighting have been verified by users; the Chroma stray-strip problem is resolved by separating the device layout, confirmed by the user. No firmware images were changed by this cleanup.**
+**v0.4.8 candidate: adds 2.4G Raw HID per-lamp RGB streaming. Wired Windows Dynamic Lighting is retained. A bridge that would make the wireless receiver appear automatically in Windows Dynamic Lighting is not implemented, and this build has no hardware verification yet.**
 
-| Feature | Status |
+v0.4.7 is the user-verified baseline: Windows recognises the keyboard once OpenRGB is closed, and the Chroma stray-strip problem disappears when the mouse layout is separated. v0.4.8 keeps the same VID/PID, lamp positions, LampArray descriptor, and 0x44 split protocol; the USB firmware revision becomes 0048.
+
+| Capability | v0.4.8 status |
 | --- | --- |
-| USB wired Windows Dynamic Lighting | Recognition confirmed after the user closed the OpenRGB background process; basic on/off works |
-| 68 lamps and left/right sync | Implemented; the user reports on-board effect switching works; full per-lamp color and long-running regression are not complete |
-| Input / right-half sleep recovery | Implemented; the right-half sleep fix is user-confirmed |
-| Chroma Studio | In the user's current layout the stray strip disappears after moving the mouse device away; other effects and long-run behavior are not fully verified |
-| 2.4G / Bluetooth dynamic lighting | Not implemented; the regular wireless input code is retained |
-| VIA / EPOMAKER Hub | Original code paths retained; the new experimental PID may not match older device filters; not fully verified |
-| BIOS / UEFI | Currently a non-Boot interface; availability is not guaranteed |
+| Wired Windows Dynamic Lighting | Unchanged from v0.4.7; software and linked-image regression pass, current build not yet verified on hardware |
+| 2.4G full-frame / single-lamp RGB streaming | Implemented over the existing Raw HID channel; wireless replies, split-side sync, and lease release are covered by software checks |
+| Native Windows Dynamic Lighting enumeration over 2.4G | Not implemented — neither a receiver-side interface nor a Windows bridge; flashing this build alone does not make the receiver appear |
+| Hub 2.4G built-in effect parameter control | Existing VIA path retained; user-confirmed on v0.4.7, v0.4.8 not yet tested |
+| Input and sleep behaviour | Earlier fixes retained, regression checks pass, long-running hardware regression not complete |
+| Bluetooth RGB streaming | Explicitly rejected in this build rather than faking success on an unverified channel |
+| VIA / Hub, BIOS/UEFI | Experimental-PID filtering and the non-Boot interface limitations remain as listed in known issues |
 
-No build environment is needed for normal use — flash `firmware/split65-dynamic-lighting-v0.4.7.bin`. Both halves use the same BIN and the hardware pins determine the side automatically. Users already running v0.4.7 on both halves do not need to reflash because of this cleanup.
+### Usage
 
-Fully exit the OpenRGB background process before using Windows Dynamic Lighting, then open Settings → Personalization → Dynamic Lighting. When using Chroma, if some keys change color together with the mouse, move the mouse device away as described in the [Chroma layout notes](docs/CHROMA.md); separating the visual frame may still leave logical lamp overlap.
+No build environment is required for normal use; the recommended candidate is `firmware/split65-dynamic-lighting-v0.4.8.bin`.
 
-> The documents under `docs/`, as well as the diagnostic tools, are currently written in Simplified Chinese.
+Users currently on v0.4.7 on both halves only need to upgrade the left half this round; keep the right half on v0.4.7 because the split protocol is unchanged. Both halves use the same BIN when updated, and the hardware pins determine the side. Keep v0.4.7 for rollback.
 
-- [Known issues and verification limits](docs/KNOWN-ISSUES.md)
-- [Chroma layout and stray-strip handling](docs/CHROMA.md)
-- [Release notes](docs/RELEASE-NOTES.md)
-- [Build instructions](docs/BUILD.md)
-- [Firmware and flashing](docs/FLASHING.md)
-- [Dependency versions and image verification](docs/build-manifest.json)
-- [Firmware SHA256](firmware/SHA256SUMS)
+Wireless check: keep the whole `tools/wireless-rgb/` folder together and open `Start-Wireless-RGB.html` in Edge/Chrome, then follow the on-page steps to switch to 2.4G and remove the keyboard's direct USB cable. The page reads the firmware information first and only offers colour controls after confirming 0.4.8. Packets are acknowledged one by one at a low rate and the client renews once per second; no data for 3 seconds, a disconnect, or a mode switch releases wireless control. The page installs no driver, changes no keymap, and does not write the lighting EEPROM.
+
+- [v0.4.8 release notes](docs/0.4.8-Wireless-RGB.md)
+- [Flashing and rollback](docs/FLASHING.md)
+- [Chroma layout handling](docs/CHROMA.md)
+- [Wireless protocol investigation](docs/WIRELESS.md)
+- [Wireless Dynamic Lighting bridge assessment](docs/WIRELESS-BRIDGE.md)
+- [Known issues](docs/KNOWN-ISSUES.md)
+- [Build](docs/BUILD.md) / [Verification scope](docs/LOCAL-VALIDATION.md)
+- [Build manifest](docs/build-manifest.json) / [firmware SHA256](firmware/SHA256SUMS)
+
+Fully exit the OpenRGB background process before using wired Windows Dynamic Lighting, and keep the mouse and keyboard logical lamp layouts separated in Chroma. There is currently no VHF, SYS, INF, or Windows installer.
+
+> The documents under `docs/`, the wireless test page, and the diagnostic tools are currently written in Simplified Chinese.
 
 ### Source layout
 
-`dynamic_lighting/` holds the protocol, the 68-lamp table, split-half synchronization, and the QMK/WB32 patches. `linker/wireless/` and `wls/` retain community wireless support plus input-release and sleep fixes. `tests/` covers the protocol, input, the legacy right-half receive callback, and descriptor checks. `tools/` contains build and diagnostic tools; none of them flash the device automatically.
+`dynamic_lighting/`: LampArray protocol, 68 lamp positions, split sync, and the compatible Raw RGB path. `linker/wireless/`: the existing wireless input and Raw HID channel. `tools/wireless-rgb/`: the candidate wireless verification page. `tests/`: production functions, protocol, input, sleep, and client-simulation checks.
 
-LampArray uses report IDs 0x20–0x25. Keyboard, mouse, consumer, NKRO, and LampArray traffic share non-Boot HID interface 0; VIA Raw HID is interface 1. USB `342D:E4C7` is a temporary experimental identity and is not claimed to be officially assigned by the vendor. There is no VHF, SYS, INF, or Windows installer.
+LampArray uses report IDs 0x20–0x25 on the non-Boot HID interface 0 shared with keyboard/mouse/consumer/NKRO; VIA Raw HID is interface 1. The 0x24/0x25/0x26 commands live inside Raw HID payloads on the other interface and are never mixed with LampArray report IDs. 342D:E4C7 is a temporary experimental identity.
 
 ### Sources and license
 

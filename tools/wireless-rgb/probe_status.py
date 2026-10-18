@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
+"""Read-only 2.4G status probe for the Split65 wireless RGB channel.
+
+Sends command 0x30 over the receiver's VIA Raw HID collection (usage page
+0xFF60) and decodes the 32-byte reply produced by split65_lamp_diagnostics().
+It never writes colours, key mappings, or EEPROM.
+
+Usage: python probe_status.py [--timeout 2.5]
+"""
+
+import argparse
+import ctypes
+import ctypes.wintypes as w
+import sys
+import time
+
+setupapi = ctypes.WinDLL("setupapi", use_last_error=True)
+hid = ctypes.WinDLL("hid", use_last_error=True)
+kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+DIGCF_PRESENT = 0x02
+DIGCF_DEVICEINTERFACE = 0x10
+FILE_SHARE_READ = 0x01
+FILE_SHARE_WRITE = 0x02
+GENERIC_READ = 0x80000000
+GENERIC_WRITE = 0x40000000
+OPEN_EXISTING = 3
+FILE_FLAG_OVERLAPPED = 0x40000000
+WAIT_OBJECT_0 = 0
+ERROR_IO_PENDING = 997
+REPORT_ID_OFFSET = 4  # SP_DEVICE_INTERFACE_DETAIL_DATA_W: DWORD cbSize, then WCHAR path
+DEVICE_CODES = {0: "USB", 1: "BLUETOOTH", 6: "2.4G"}
+
+
+class GUID(ctypes.c_ubyte * 16):
+    pass
+
+
+class SP_DEVICE_INTERFACE_DATA(ctypes.Structure):
+    _fields_ = [("cbSize", w.DWORD), ("InterfaceClassGuid", GUID),
+                ("Flags", w.DWORD), ("Reserved", ctypes.c_size_t)]
+
+
+class SP_DEVICE_INTERFACE_DETAIL_DATA_W(ctypes.Structure):
+    _fields_ = [("cbSize", w.DWORD), ("DevicePath", ctypes.c_wchar * 1)]
+
+
+class HIDD_ATTRIBUTES(ctypes.Structure):
+    _fields_ = [("Size", w.ULONG), ("VendorID", w.USHORT),
+                ("ProductID", w.USHORT), ("VersionNumber", w.USHORT)]
+
+
+class HIDP_CAPS(ctypes.Structure):
+    _fields_ = [("Usage", w.USHORT), ("UsagePage", w.USHORT),
+                ("InputReportByteLength", w.USHORT), ("OutputReportByteLength", w.USHORT),
+                ("FeatureReportByteLength", w.USHORT), ("Reserved", w.USHORT * 17),
+                ("NumberLinkCollectionNodes", w.USHORT),
+                ("NumberInputButtonCaps", w.USHORT), ("NumberInputValueCaps", w.USHORT),
+                ("NumberInputDataIndices", w.USHORT),
+                ("NumberOutputButtonCaps", w.USHORT), ("NumberOutputValueCaps", w.USHORT),
+                ("NumberOutputDataIndices", w.USHORT),
+                ("NumberFeatureButtonCaps", w.USHORT), ("NumberFeatureValueCaps", w.USHORT),
+                ("NumberFeatureDataIndices", w.USHORT)]
+
+
+class OVERLAPPED(ctypes.Structure):
+    _fields_ = [("Internal", ctypes.c_size_t), ("InternalHigh", ctypes.c_size_t),
+                ("Offset", w.DWORD), ("OffsetHigh", w.DWORD), ("hEvent", w.HANDLE)]
+
+
+hid.HidD_GetHidGuid.argtypes = [ctypes.POINTER(GUID)]
+hid.HidD_GetAttributes.argtypes = [w.HANDLE, ctypes.POINTER(HIDD_ATTRIBUTES)]
+hid.HidD_GetPreparsedData.argtypes = [w.HANDLE, ctypes.POINTER(ctypes.c_void_p)]
+hid.HidD_FreePreparsedData.argtypes = [ctypes.c_void_p]
+hid.HidP_GetCaps.argtypes = [ctypes.c_void_p, ctypes.POINTER(HIDP_CAPS)]
+setupapi.SetupDiGetClassDevsW.restype = w.HANDLE
+setupapi.SetupDiGetClassDevsW.argtypes = [ctypes.POINTER(GUID), w.LPCWSTR, w.HWND, w.DWORD]
+setupapi.SetupDiEnumDeviceInterfaces.argtypes = [
+    w.HANDLE, ctypes.c_void_p, ctypes.POINTER(GUID), w.DWORD, ctypes.POINTER(SP_DEVICE_INTERFACE_DATA)]
+setupapi.SetupDiGetDeviceInterfaceDetailW.argtypes = [
+    w.HANDLE, ctypes.POINTER(SP_DEVICE_INTERFACE_DATA),
+    ctypes.POINTER(SP_DEVICE_INTERFACE_DETAIL_DATA_W), w.DWORD,
+    ctypes.POINTER(w.DWORD), ctypes.c_void_p]
+setupapi.SetupDiDestroyDeviceInfoList.argtypes = [w.HANDLE]
+kernel32.CreateFileW.restype = w.HANDLE
+kernel32.CreateEventW.restype = w.HANDLE
+kernel32.CreateEventW.argtypes = [ctypes.c_void_p, w.BOOL, w.BOOL, w.LPCWSTR]
+kernel32.WriteFile.argtypes = [w.HANDLE, ctypes.c_void_p, w.DWORD,
+                              ctypes.POINTER(w.DWORD), ctypes.POINTER(OVERLAPPED)]
+kernel32.ReadFile.argtypes = [w.HANDLE, ctypes.c_void_p, w.DWORD,
+                             ctypes.POINTER(w.DWORD), ctypes.POINTER(OVERLAPPED)]
+kernel32.GetOverlappedResult.argtypes = [w.HANDLE, ctypes.POINTER(OVERLAPPED),
+                                         ctypes.POINTER(w.DWORD), w.BOOL]
+kernel32.WaitForSingleObject.argtypes = [w.HANDLE, w.DWORD]
+kernel32.CloseHandle.argtypes = [w.HANDLE]
+
+
+def find_receiver():
+    guid = GUID()
+    hid.HidD_GetHidGuid(ctypes.byref(guid))
+    hdev = setupapi.SetupDiGetClassDevsW(ctypes.byref(guid), None, None,
+                                         DIGCF_PRESENT | DIGCF_DEVICEINTERFACE)
+    found = []
+    index = 0
+    while True:
+        did = SP_DEVICE_INTERFACE_DATA()
+        did.cbSize = ctypes.sizeof(did)
+        if not setupapi.SetupDiEnumDeviceInterfaces(hdev, None, ctypes.byref(guid), index,
+                                                    ctypes.byref(did)):
+            break
+        index += 1
+        need = w.DWORD(0)
+        setupapi.SetupDiGetDeviceInterfaceDetailW(hdev, ctypes.byref(did), None, 0,
+                                                  ctypes.byref(need), None)
+        buf = ctypes.create_string_buffer(need.value)
+        detail = ctypes.cast(buf, ctypes.POINTER(SP_DEVICE_INTERFACE_DETAIL_DATA_W))
+        detail.contents.cbSize = 8 if ctypes.sizeof(ctypes.c_void_p) == 8 else 6
+        if not setupapi.SetupDiGetDeviceInterfaceDetailW(hdev, ctypes.byref(did), detail,
+                                                         need.value, ctypes.byref(need), None):
+            continue
+        path = ctypes.wstring_at(ctypes.addressof(detail.contents) + REPORT_ID_OFFSET)
+        handle = kernel32.CreateFileW(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                      None, OPEN_EXISTING, 0, None)
+        if handle in (0, w.HANDLE(-1).value):
+            continue
+        attrs = HIDD_ATTRIBUTES()
+        attrs.Size = ctypes.sizeof(attrs)
+        hid.HidD_GetAttributes(handle, ctypes.byref(attrs))
+        caps = HIDP_CAPS()
+        preparsed = ctypes.c_void_p()
+        if hid.HidD_GetPreparsedData(handle, ctypes.byref(preparsed)):
+            hid.HidP_GetCaps(preparsed, ctypes.byref(caps))
+            hid.HidD_FreePreparsedData(preparsed)
+        kernel32.CloseHandle(handle)
+        if attrs.VendorID == 0x342D and caps.UsagePage == 0xFF60:
+            found.append((path, attrs, caps))
+    setupapi.SetupDiDestroyDeviceInfoList(hdev)
+    return found
+
+
+def io_write(handle, data, timeout_ms):
+    event = kernel32.CreateEventW(None, True, False, None)
+    ov = OVERLAPPED()
+    ov.hEvent = event
+    written = w.DWORD(0)
+    buf = ctypes.create_string_buffer(bytes(data), len(data))
+    ok = kernel32.WriteFile(handle, buf, len(data), ctypes.byref(written), ctypes.byref(ov))
+    if not ok and ctypes.get_last_error() != ERROR_IO_PENDING:
+        kernel32.CloseHandle(event)
+        return False
+    kernel32.WaitForSingleObject(event, timeout_ms)
+    got = w.DWORD(0)
+    kernel32.GetOverlappedResult(handle, ctypes.byref(ov), ctypes.byref(got), False)
+    kernel32.CloseHandle(event)
+    return got.value == len(data)
+
+
+def io_read(handle, size, timeout_ms):
+    event = kernel32.CreateEventW(None, True, False, None)
+    ov = OVERLAPPED()
+    ov.hEvent = event
+    buf = ctypes.create_string_buffer(size)
+    got = w.DWORD(0)
+    ok = kernel32.ReadFile(handle, buf, size, ctypes.byref(got), ctypes.byref(ov))
+    if not ok and ctypes.get_last_error() != ERROR_IO_PENDING:
+        kernel32.CloseHandle(event)
+        return None
+    if kernel32.WaitForSingleObject(event, timeout_ms) != WAIT_OBJECT_0:
+        kernel32.CloseHandle(event)
+        return None
+    kernel32.GetOverlappedResult(handle, ctypes.byref(ov), ctypes.byref(got), False)
+    kernel32.CloseHandle(event)
+    return buf.raw[:got.value] if got.value else None
+
+
+def decode(payload):
+    def at(i):
+        return payload[i] if i < len(payload) else None
+    return {
+        "signature": bytes(payload[1:4]).decode("ascii", "replace"),
+        "revision": at(4),
+        "flags": at(6),
+        "lamp_count": at(8),
+        "autonomous": at(19),
+        "raw_active": at(20),
+        "device": at(21),
+        "rgb_enabled": at(22),
+        "rgb_mode": at(23),
+        "raw_protocol": at(26),
+        "raw_device": at(27),
+        "lease_seconds": at(28),
+        "module_state": at(29),
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Read-only Split65 2.4G status probe")
+    parser.add_argument("--timeout", type=float, default=2.5, help="reply timeout seconds")
+    args = parser.parse_args()
+
+    receivers = find_receiver()
+    if not receivers:
+        print("no Split65 rawhid collection (usage 0xFF60) found; is the receiver plugged in?")
+        return 2
+    path, attrs, caps = receivers[0]
+    print("receiver: VID %04X PID %04X bcd %04X" % (attrs.VendorID, attrs.ProductID, attrs.VersionNumber))
+    print("raw hid : in=%d out=%d usage 0x%04X/0x%04X"
+          % (caps.InputReportByteLength, caps.OutputReportByteLength, caps.UsagePage, caps.Usage))
+
+    handle = kernel32.CreateFileW(path, GENERIC_READ | GENERIC_WRITE,
+                                  FILE_SHARE_READ | FILE_SHARE_WRITE, None,
+                                  OPEN_EXISTING, FILE_FLAG_OVERLAPPED, None)
+    if handle in (0, w.HANDLE(-1).value):
+        print("could not open the raw HID collection for read/write")
+        return 3
+
+    for _ in range(4):  # drain stale reports
+        if io_read(handle, 64, 120) is None:
+            break
+
+    if not io_write(handle, bytes([0x00, 0x30] + [0] * 31), 1000):
+        print("write of command 0x30 failed")
+        kernel32.CloseHandle(handle)
+        return 4
+
+    deadline = time.time() + args.timeout
+    reply = None
+    while time.time() < deadline:
+        chunk = io_read(handle, 64, 400)
+        if chunk:
+            reply = chunk
+            break
+    kernel32.CloseHandle(handle)
+
+    if not reply:
+        print("no reply within %.1f s" % args.timeout)
+        print("check: keyboard in 2.4G mode, paired to this receiver, v0.4.8 flashed")
+        return 5
+
+    payload = reply[1:] if len(reply) == 33 else reply
+    info = decode(payload)
+    print("reply   : " + reply.hex())
+    print("signature: %r  revision: 0x%02X" % (info["signature"], info["revision"] or 0))
+    print("lamps   : %s" % info["lamp_count"])
+    print("device  : %s (%s)" % (info["device"], DEVICE_CODES.get(info["device"], "?")))
+    print("raw     : active=%s protocol=%s device=%s lease=%ss"
+          % (info["raw_active"], info["raw_protocol"], info["raw_device"], info["lease_seconds"]))
+    print("module  : state=%s autonomous=%s" % (info["module_state"], info["autonomous"]))
+
+    ok = (info["signature"] == "DL2" and info["revision"] == 0x48
+          and info["lamp_count"] == 68 and info["raw_protocol"] == 1)
+    print("verdict : %s" % ("v0.4.8 wireless channel ready" if ok else "unexpected answer"))
+    return 0 if ok else 6
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <assert.h>
+#include "../../linker/wireless/module.h"
+#include "../../linker/wireless/transport.h"
 #define PACKED __attribute__((packed))
 #define RGB_MATRIX_LED_COUNT 68
 #define RGB_MATRIX_MAXIMUM_BRIGHTNESS 150
@@ -14,7 +16,10 @@
 #define USER_SYNC_LAMPARRAY 10
 #define LED_POWER_EN_PIN 5
 #define LED_POWER_EN2_PIN 8
-#define DEVS_USB 0
+#define WIRELESS_ENABLE
+#define RAW_ENABLE 1
+#define RAW_EPSIZE 32
+#define USB_ENDPOINT_IN_RAW 1
 #define USB_ACTIVE 1
 typedef struct USBDriver {
     uint8_t setup[8];
@@ -34,6 +39,8 @@ extern USBDriver mock_usb;
 extern bool mock_master, mock_enabled, mock_suspended, mock_locked, mock_rpc_fail, mock_old_revision;
 extern uint8_t mock_native[2][7], mock_raw_reply[32];
 extern unsigned mock_device, mock_mode_reset, mock_power_on, mock_flush;
+extern unsigned mock_usb_replies, mock_wireless_replies;
+extern uint8_t mock_radio_state;
 extern uint32_t mock_clock;
 extern uint8_t mock_pixels[68][3];
 extern void (*mock_rpc)(uint8_t, const void *, uint8_t, void *);
@@ -43,7 +50,7 @@ static inline uint32_t timer_read32(void) { return mock_clock; }
 static inline uint32_t timer_elapsed32(uint32_t t) { return mock_clock - t; }
 static inline void chSysLock(void) { assert(!mock_locked); mock_locked = true; }
 static inline void chSysUnlock(void) { assert(mock_locked); mock_locked = false; }
-static inline unsigned wireless_get_current_devs(void) { return mock_device; }
+uint8_t wireless_get_current_devs(void);
 static inline bool rgb_matrix_is_enabled(void) { return mock_native[!mock_master][5]; }
 static inline bool rgb_matrix_get_suspend_state(void) { return mock_suspended; }
 static inline unsigned rgb_matrix_get_mode(void) { return mock_native[!mock_master][0]; }
@@ -60,7 +67,8 @@ static inline void rgb_matrix_set_speed_noeeprom(uint8_t v) { mock_native[!mock_
 static inline void rgb_matrix_set_flags_noeeprom(uint8_t v) { mock_native[!mock_master][6] = v; }
 static inline void rgb_matrix_enable_noeeprom(void) { mock_native[!mock_master][5] = 1; }
 static inline void rgb_matrix_disable_noeeprom(void) { mock_native[!mock_master][5] = 0; }
-static inline void raw_hid_send(uint8_t *p, uint8_t n) { assert(n == 32); for (unsigned i = 0; i < n; ++i) mock_raw_reply[i] = p[i]; }
+static inline void raw_hid_send(uint8_t *p, uint8_t n) { assert(n == 32); ++mock_usb_replies; for (unsigned i = 0; i < n; ++i) mock_raw_reply[i] = p[i]; }
+static inline void send_report(unsigned endpoint, uint8_t *p, uint8_t n) { assert(endpoint == USB_ENDPOINT_IN_RAW); raw_hid_send(p, n); }
 static inline void gpio_write_pin_low(unsigned p) { (void)p; }
 static inline void gpio_write_pin_high(unsigned p) { (void)p; ++mock_power_on; }
 static inline void rgb_matrix_update_pwm_buffers(void) { ++mock_flush; }

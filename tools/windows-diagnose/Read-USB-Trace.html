@@ -45,7 +45,7 @@ readButton.addEventListener('click',async()=>{
   line('Peer=0x'+hx(d[7])+'; peer left='+!!d[24]+'; lamps='+d[8]);
   line('Split RPC success='+u32(d,10)+'; failure='+u32(d,14)+'; retry interval='+(d[25]*10)+' ms');
   line('Autonomous='+d[19]+'; raw stream='+d[20]);
-  if(![0x43,0x44,0x45,0x46,0x47].includes(d[4])||d[7]!==Math.min(d[4],0x44))line('注意：两半版本不一致或尚无兼容应答。');
+  if(![0x43,0x44,0x45,0x46,0x47,0x48].includes(d[4])||d[7]!==Math.min(d[4],0x44))line('注意：两半版本不一致或尚无兼容应答。');
   if(d[21]!==0||!(d[6]&1))line('注意：当前不是有线主机模式。');
   const s=await query(0x31);
   if(s[2]!==84||s[3]!==82)throw new Error('USB 轨迹标记错误');

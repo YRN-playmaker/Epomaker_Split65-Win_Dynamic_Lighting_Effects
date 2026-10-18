@@ -8,12 +8,20 @@ bool mock_rpc_fail, mock_old_revision;
 uint8_t mock_native[2][7] = {{1, 0, 255, 150, 128, 1, 0xFF}, {1, 0, 255, 150, 128, 1, 0xFF}};
 uint8_t mock_raw_reply[32];
 unsigned mock_device, mock_mode_reset, mock_power_on, mock_flush;
+unsigned mock_usb_replies, mock_wireless_replies;
+uint8_t mock_radio_state = MD_STATE_CONNECTED;
+uint8_t wireless_get_current_devs(void) { return mock_device; }
+uint8_t *md_getp_state(void) { return &mock_radio_state; }
+transport_t get_transport(void) { return mock_device == DEVS_USB ? TRANSPORT_USB : TRANSPORT_WLS; }
+void md_send_raw(uint8_t *p, uint8_t n) { assert(n == 32); ++mock_wireless_replies; memcpy(mock_raw_reply, p, n); }
 uint32_t mock_clock;
 uint8_t mock_pixels[68][3];
 void (*mock_rpc)(uint8_t, const void *, uint8_t, void *);
 // Include the production adapter, so the test exercises USB and split callbacks.
 #include "../dynamic_lighting/lamparray.c"
 #include "../dynamic_lighting/compat.c"
+#include "../linker/wireless/md_raw.c"
+void raw_hid_receive(uint8_t *data, uint8_t length) { assert(via_command_kb(data, length)); }
 #ifdef SPLIT65_TEST_SLAVE_V044
 #    include "fixtures/receive_frame_v0.4.4.inc"
 #endif
@@ -162,7 +170,7 @@ int main(void) {
     mock_clock += 10; split65_lamp_task(); assert(rpc_success == successes + 1);
     via[0] = 0x30;
     assert(via_command_kb(via, sizeof(via)) && !memcmp(via + 1, "DL2", 3));
-    assert(via[4] == 0x47 && via[7] == 0x44 && via[8] == 68 && via[24] == 0);
+    assert(via[4] == 0x48 && via[7] == 0x44 && via[8] == 68 && via[24] == 0);
     // Observe actual USB transactions without changing light ownership or RGB.
     via[0] = 0x31; via[1] = 2;
     assert(via_command_kb(via, sizeof(via)) && via[2] == 1);
@@ -179,5 +187,51 @@ int main(void) {
     assert(via_command_kb(via, sizeof(via)) && via[3] == 0);
     control[1] = 0; set_request(control[0], control, 2); split65_lamp_task();
     assert(split65_lamp_active()); split65_lamp_reset(); assert(!split65_lamp_active());
-    puts("PASS: shared-interface USB routing, 68-lamp commit, native sync, 0.4.7 USB / matching 0.4.4 split protocol, VIA, bounded USB trace, autonomous restore");
+    // Real wireless receive and reply wrappers: no active keyboard USB needed.
+    mock_device = DEVS_2G4; mock_usb.state = 0;
+    split65_lamp_mode_changed();
+    unsigned usb_replies = mock_usb_replies, wireless_replies = mock_wireless_replies;
+    memset(via, 0, sizeof(via)); via[0] = 0x24; via[1] = 67; via[2] = 1; via[5] = 255;
+    md_receive_raw_cb(via, sizeof(via));
+    assert(mock_wireless_replies == wireless_replies + 1 && mock_usb_replies == usb_replies);
+    for (unsigned i = 0; i < 20; ++i) { mock_clock += 10; split65_lamp_task(); }
+    assert(split65_lamp_active() && local_frame[67].b == 150 && remote_frame[67].b == 150);
+    assert(split65_lamp_render() && mock_pixels[67][2] == 150);
+    // A USB-only reset cannot take ownership away from a radio client.
+    split65_lamp_reset(); assert(split65_lamp_active());
+    mock_usb.state = USB_ACTIVE;
+    control[1] = 0; set_request(control[0], control, 2);
+    split65_lamp_task(); assert(local_frame[67].b == 150); // Ignore stale USB colors in radio mode.
+    split65_lamp_reset(); assert(split65_lamp_active());
+    // Lease renewal keeps a static frame alive without retransmitting all LEDs.
+    via[0] = 0x25; via[1] = 0;
+    for (unsigned i = 0; i < 5; ++i) {
+        mock_clock += 2000; md_receive_raw_cb(via, sizeof(via)); split65_lamp_task();
+        assert(split65_lamp_active());
+    }
+    // Timer rollover and exact expiry boundary; native effects resume on both halves.
+    mock_clock = UINT32_MAX - 1000; assert(split65_lamp_raw_enable(true));
+    mock_clock += 2999; assert(split65_lamp_active());
+    ++mock_clock; assert(!split65_lamp_active());
+    for (unsigned i = 0; i < 20; ++i) { mock_clock += 10; split65_lamp_task(); }
+    assert(!raw_active && !remote_active && !split65_lamp_render());
+    // Radio loss releases immediately. Reconnect alone must not replay stale RGB.
+    assert(split65_lamp_raw_enable(true)); split65_lamp_task();
+    mock_radio_state = 0; assert(!split65_lamp_active()); split65_lamp_task();
+    mock_radio_state = MD_STATE_CONNECTED; assert(!split65_lamp_active());
+    // The disconnected and Bluetooth paths reject streaming instead of faking success.
+    mock_radio_state = 0; via[0] = 0x25; via[1] = 0;
+    md_receive_raw_cb(via, sizeof(via)); assert(mock_raw_reply[1] == 253);
+    mock_radio_state = MD_STATE_CONNECTED; mock_device = 1; split65_lamp_mode_changed();
+    via[0] = 0x24; via[1] = 67; via[2] = 1;
+    md_receive_raw_cb(via, sizeof(via)); assert(mock_raw_reply[1] == 253 && !split65_lamp_active());
+    mock_device = DEVS_2G4; split65_lamp_mode_changed(); assert(split65_lamp_raw_enable(true));
+    mock_device = DEVS_USB; split65_lamp_mode_changed();
+    assert(!raw_active && state.autonomous && !split65_lamp_active());
+    // Wired static streams retain their existing non-expiring behavior.
+    assert(split65_lamp_raw_enable(true)); mock_clock += 60000; split65_lamp_task();
+    assert(split65_lamp_active()); mock_usb.state = 0; split65_lamp_task(); assert(!raw_active);
+    mock_usb.state = USB_ACTIVE; assert(!split65_lamp_active());
+    assert(!split65_lamp_stream(0, 0, via));
+    puts("PASS: USB LampArray, native sync, 0.4.8 / 0.4.4 split compatibility; production wireless Raw HID replies, both-half RGB, lease/rollover/disconnect/mode/reset/USB regression");
 }

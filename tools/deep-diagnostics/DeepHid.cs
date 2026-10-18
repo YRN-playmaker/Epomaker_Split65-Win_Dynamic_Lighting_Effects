@@ -107,7 +107,7 @@ public static class DeepHid {
     public static void Metadata(string path) {
         using(var h=CreateFile(path,0,3,IntPtr.Zero,3,0,IntPtr.Zero)) {
             if(h.IsInvalid)throw new Win32Exception(Marshal.GetLastWin32Error());var a=new Attributes();a.Size=(uint)Marshal.SizeOf(typeof(Attributes));if(HidD_GetAttributes(h,ref a)==0)throw new Win32Exception(Marshal.GetLastWin32Error());
-            if(a.Vendor!=0x342D||(a.Product!=0xE4C6&&a.Product!=0xE4C7)||a.Version<0x42||a.Version>0x47)throw new InvalidOperationException("Unsupported firmware: no Feature writes sent");
+            if(a.Vendor!=0x342D||(a.Product!=0xE4C6&&a.Product!=0xE4C7)||a.Version<0x42||a.Version>0x48)throw new InvalidOperationException("Unsupported firmware: no Feature writes sent");
             IntPtr p;if(HidD_GetPreparsedData(h,out p)==0)throw new Win32Exception(Marshal.GetLastWin32Error());
             try {Caps c;if(HidP_GetCaps(p,out c)!=0x110000||c.UsagePage!=0x59||c.Usage!=1||c.FeatureLength!=51)throw new InvalidOperationException("Not expected LampArray capabilities");
                 byte first=a.Version<=0x45?(byte)1:(byte)0x20;var values=Values(p,c.FeatureValues);

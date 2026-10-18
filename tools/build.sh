@@ -35,13 +35,13 @@ python3 "$project_dir/tools/install_keyboard.py" "$project_dir" "$build_dir"
 mkdir -p "$project_dir/firmware"
 cd "$build_dir"
 make SKIP_GIT=yes BREAK_ON_ERRORS=yes epomaker/split65:default
-cp epomaker_split65_default.bin "$project_dir/firmware/split65-dynamic-lighting-v0.4.7.bin"
+cp epomaker_split65_default.bin "$project_dir/firmware/split65-dynamic-lighting-v0.4.8.bin"
 # A separate keymap target avoids stale objects built with different defines.
 mkdir -p keyboards/epomaker/split65/keymaps/inputcheck
 cp keyboards/epomaker/split65/keymaps/default/{keymap.c,config.h,rules.mk} keyboards/epomaker/split65/keymaps/inputcheck/
 echo 'DYNAMIC_LIGHTING_ENABLE = no' >> keyboards/epomaker/split65/keymaps/inputcheck/rules.mk
 make SKIP_GIT=yes BREAK_ON_ERRORS=yes epomaker/split65:inputcheck
-cp epomaker_split65_inputcheck.bin "$project_dir/firmware/split65-input-check-v0.4.7.bin"
+cp epomaker_split65_inputcheck.bin "$project_dir/firmware/split65-input-check-v0.4.8.bin"
 python3 "$project_dir/tests/check_linked_usb.py" "$build_dir"
 python3 "$project_dir/tools/record_build.py" "$project_dir"
 echo 'Built both images. No device has been flashed.'

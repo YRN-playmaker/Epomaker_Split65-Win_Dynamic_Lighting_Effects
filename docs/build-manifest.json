@@ -1,11 +1,11 @@
 {
   "target": "epomaker/split65",
   "date": "2026-10-18",
-  "revision": "0.4.7-user-confirmed-Chroma-layout-workaround",
-  "usb_bcd_device": "0x0047",
+  "revision": "0.4.8-wireless-raw-rgb-candidate",
+  "usb_bcd_device": "0x0048",
   "led_backend": "upstream complete 68-entry address space; no RGB_MATRIX_SPLIT",
-  "hardware_tested": true,
-  "windows_tested": true,
+  "hardware_tested": false,
+  "windows_tested": false,
   "qmk_base": "c64b964e0785a0345e8901fc15120a607cface9b",
   "official_base": "8e253c005ee0bbacac0db3a09538d94ce3650ac5",
   "community_reference": "3978e3e18e3de9cf95ee1256ca6c1754804678a5",
@@ -27,6 +27,10 @@
       "size_bytes": 78776,
       "sha256": "726045f71d0879576e029253cfbce577ceee371c6ea817f0b586f06c4239b5e7"
     },
+    "split65-dynamic-lighting-v0.4.8.bin": {
+      "size_bytes": 79056,
+      "sha256": "e3d2458b636d0ad9f265ba89dbb7efdb3391b9fe0fd5db4d7ea845caff2724d0"
+    },
     "split65-input-check-v0.4.4.bin": {
       "size_bytes": 73188,
       "sha256": "560985d7c6e4fbab08502887ee1104ea6c65af41c11fad0802a84a5ad80963d8"
@@ -34,11 +38,15 @@
     "split65-input-check-v0.4.7.bin": {
       "size_bytes": 73188,
       "sha256": "2af957b6afa4a6d47abdb7ad109c647166d4d7590224d785d02952adf9d919dc"
+    },
+    "split65-input-check-v0.4.8.bin": {
+      "size_bytes": 73188,
+      "sha256": "dad710fc6885f5e3810cad43b8bfd31e9b14dbd61eba9024b99177bf2b443f94"
     }
   },
   "usb_layout": "non-boot shared keyboard/mouse/media/NKRO/LampArray 0; VIA raw 1; Lamp IDs 0x20..0x25",
-  "split_wire_protocol": "0x44; 0.4.7 host tested against delivered 0.4.4 target callback",
-  "status": "Experimental: Windows native recognized after OpenRGB removal; both halves reported v0.4.7; user confirms Chroma coupling cleared after layout separation; firmware bytes unchanged",
+  "split_wire_protocol": "0x44 unchanged; current host tested against delivered 0.4.4 receive callback",
+  "status": "Built and software-regression checked; 2.4G Raw RGB implemented; no 0.4.8 hardware result; wireless Windows LampArray bridge NOT implemented",
   "usb_identity": "342D:E4C7 temporary experimental PID; no serial",
   "feature_reply": "actual length clamped to host wLength; 23/29/2 bytes including report ID",
   "base_0_4_4_sleep_fix_user_confirmed": true,
@@ -50,6 +58,16 @@
   "wb32_ep0_patch": "dynamic_lighting/wb32-ep0.patch; enabled only for LampArray build",
   "metadata_cursor": "read-only preparation; full IN data completion advances; reset restores lamp 0",
   "validation_scope": {
+    "source": "Linux build and production-function/model checks only; no connected Windows hardware",
+    "hardware": "not tested for 0.4.8",
+    "windows_native_usb": "inherited 0.4.7 topology and descriptors, linked-image checked; current hardware result pending",
+    "wireless_raw_rgb": "implemented; production adapter/transport regression passed; real receiver throughput and lighting pending",
+    "wireless_lamparray": "NOT implemented: neither receiver-native interface nor Windows virtual bridge supplied",
+    "right_firmware": "may remain 0.4.7; wire protocol 0x44 unchanged; previous 0.4.4 receiver callback exercised",
+    "hlk_certified": false,
+    "razer_certified": false
+  },
+  "baseline_0_4_7_validation": {
     "source": "user-reported hardware observations; no development-host access to Windows hardware",
     "windows_native_enumeration": "user reconfirmed after OpenRGB removal with both halves at reported v0.4.7",
     "windows_basic_lighting": "user confirms on/off",
@@ -70,5 +88,15 @@
     "chroma_coordinate_model": "Inferred 40-pixel grid predicts original P/native-mouse collision and all five WDL conflicts; model overlap 8->0 after mouse layout separation, user confirms symptom gone; internal implementation unverified",
     "chroma_latest_export": "3 devices: Split65 plus native and WDL Cobra Pro representations; static layer has no saved regions",
     "chroma_layout_workaround_user_confirmed": true
+  },
+  "wireless_raw": {
+    "report_size": 32,
+    "max_rgb_lamps_per_packet": 9,
+    "wireless_lease_ms": 3000,
+    "supported_modes": [
+      "USB",
+      "2.4G"
+    ],
+    "bluetooth": false
   }
 }
