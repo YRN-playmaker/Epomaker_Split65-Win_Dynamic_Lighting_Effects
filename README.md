@@ -1,4 +1,5 @@
 # EPOMAKER Split65 Windows 动态照明 — 0.5.0 候选
+<img width="832" height="350" alt="image" src="https://github.com/user-attachments/assets/03dade2a-57f4-4cfd-a131-0f1a1ddb1665" />
 
 中文 | [English](README.en.md)
 
