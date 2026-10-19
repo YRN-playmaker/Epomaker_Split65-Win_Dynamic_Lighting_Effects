@@ -1,5 +1,7 @@
 # Chroma 布局与串灯处理
 
+[English](CHROMA.en.md) | 中文
+
 0.4.9.3 Companion 已内置“修复 Chroma 串灯”。从 Chroma Studio 导出当前配置，在 Companion 中选择并保存分离副本，再导入 Chroma 并选中 `[Split65 separated]` 配置。无需 Python 或重刷键盘；原配置不覆盖。支持已观察到的 version 1、未旋转、0/40 像素灯格 JSON 导出。此工具依据下述模型处理完整矩阵，当前 `】` 效果及新版本实际导入仍需验证。
 
 2026-10-18，用户确认导入分离设备布局后，原先的键盘按键与 Cobra Pro 鼠标串灯现象消失。两半均为 v0.4.7，处理时没有改动固件、驱动、灯号或按键绑定。

@@ -1,5 +1,7 @@
 # 构建与检查
 
+[English](BUILD.en.md) | 中文
+
 已验证环境：Linux、QMK CLI 1.2.0、ARM GCC 13.2.1 20231009。需要 Git、Python 3、GNU Make、ARM bare-metal 工具链及 newlib；协议测试还需要本机 GCC。可在配置了这些工具的 WSL/Linux 环境构建。Windows 检查 CMD 不需要构建环境。
 
 在专用 Python 虚拟环境可安装固定 CLI：
